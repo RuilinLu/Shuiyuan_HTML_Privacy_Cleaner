@@ -7,6 +7,9 @@
     <ImplicitUsings>disable</ImplicitUsings>
     <AssemblyName>ShuiyuanHtmlPrivacyCleaner</AssemblyName>
     <RootNamespace>ShuiyuanHtmlPrivacyCleaner</RootNamespace>
+    <Version>6.0.0</Version>
+    <FileVersion>6.0.0.0</FileVersion>
+    <AssemblyVersion>6.0.0.0</AssemblyVersion>
     <ApplicationIcon>Figure\shuiyuan_symbol_app_icon.ico</ApplicationIcon>
     <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
     <PublishSingleFile>true</PublishSingleFile>

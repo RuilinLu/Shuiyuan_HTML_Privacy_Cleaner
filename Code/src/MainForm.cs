@@ -24,7 +24,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
 
         public MainForm()
         {
-            Text = "水源 HTML 隐私清理工具 V5";
+            Text = "水源 HTML 隐私清理工具 V6";
             StartPosition = FormStartPosition.CenterScreen;
             MinimumSize = new Size(980, 700);
             Size = new Size(1140, 800);
@@ -95,7 +95,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
             textPanel.Controls.Add(title, 0, 0);
 
             Label subtitle = new Label();
-            subtitle.Text = "V5 直接在原始 Discourse/SingleFile 框架上匿名化，保留版式并移除用户、徽章、站点和外链痕迹。";
+            subtitle.Text = "V6 直接在原始 Discourse/SingleFile 框架上匿名化，保留版式并移除用户、徽章、站点和外链痕迹。";
             subtitle.Dock = DockStyle.Fill;
             subtitle.TextAlign = ContentAlignment.TopLeft;
             subtitle.ForeColor = Color.FromArgb(74, 108, 179);

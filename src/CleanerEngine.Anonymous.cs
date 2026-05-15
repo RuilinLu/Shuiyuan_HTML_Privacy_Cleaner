@@ -20,6 +20,11 @@ namespace ShuiyuanHtmlPrivacyCleaner
     internal sealed partial class CleanerEngine
     {
         private const string TransparentAvatarDataUri = "data:image/gif;base64,R0lGODlhAQABAAAAACwAAAAAAQABAAA=";
+        private static readonly string[] AnonymousAvatarPalette = new string[]
+        {
+            "#2f6f73", "#8f4f76", "#6b6fb3", "#b36a40", "#4f7f52", "#8a6f2f",
+            "#3f7aa6", "#9b4f4f", "#5f6b3f", "#7453a6", "#477070", "#a05f7a"
+        };
 
         private void ApplyFullAnonymization(ref string text)
         {
@@ -29,12 +34,14 @@ namespace ShuiyuanHtmlPrivacyCleaner
             List<UserAliasProfile> profiles = ExtractUserAliasProfiles(text);
             AssignUserPseudonyms(profiles);
 
+            ReplaceUserAliases(ref text, profiles);
+            AnnotateAnonymousPosts(ref text);
             NeutralizeSiteSpecificUrls(ref text);
             NeutralizeAvatarImages(ref text);
             StripUserDataAttributes(ref text);
             StripBadgeAndFlairNodes(ref text);
             StripHiddenIdentityNodes(ref text);
-            ReplaceUserAliases(ref text, profiles);
+            RemoveInteractiveAndRecommendationShell(ref text);
             NormalizeNamesBlocks(ref text);
             ReplaceSiteTerms(ref text);
             StripSiteClasses(ref text);
@@ -88,7 +95,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
         {
             text = Regex.Replace(
                 text,
-                @"\b(?<attr>href|src|content|data-download-href)=(?<quote>[""']?)(?<url>https?://(?!www\.w3\.org/)[^""'\s>]+)(?<endquote>[""']?)",
+                @"\b(?<attr>href|src|srcset|poster|content|data-download-href|data-onebox-src|data-orig-src|data-small-upload|data-large-upload|data-thumbnail-src)=(?<quote>[""']?)(?<url>https?://(?!www\.w3\.org/)[^""'\s>]+)(?<endquote>[""']?)",
                 delegate (Match match)
                 {
                     string attr = match.Groups["attr"].Value;
@@ -120,16 +127,35 @@ namespace ShuiyuanHtmlPrivacyCleaner
 
         private void NeutralizeAvatarImages(ref string text)
         {
+            NeutralizeRawSvgAvatarImages(ref text);
+
             text = Regex.Replace(
                 text,
                 @"<img\b(?<attrs>[^>]*\bclass=(?:""[^""]*\bavatar\b[^""]*""|'[^']*\bavatar\b[^']*'|[^\s>]*\bavatar\b[^\s>]*)[^>]*)>",
                 delegate (Match match)
                 {
                     string attrs = match.Groups["attrs"].Value;
-                    attrs = Regex.Replace(attrs, @"\bsrc=([""']).*?\1", "src=\"" + TransparentAvatarDataUri + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    attrs = Regex.Replace(attrs, @"\bsrc=(?![""'])[^\s>]+", "src=\"" + TransparentAvatarDataUri + "\"", RegexOptions.IgnoreCase);
-                    attrs = Regex.Replace(attrs, @"\balt=([""']).*?\1", "alt=\"\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
-                    attrs = Regex.Replace(attrs, @"\btitle=([""']).*?\1", string.Empty, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    string pseudonym = ExtractPseudonymFromAttributes(attrs);
+                    string avatarUri = BuildAnonymousAvatarDataUri(pseudonym);
+                    attrs = Regex.Replace(attrs, @"\bsrc=([""']).*?\1", "src=\"" + avatarUri + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    attrs = Regex.Replace(attrs, @"\bsrc=(?![""'])[^\s>]+", "src=\"" + avatarUri + "\"", RegexOptions.IgnoreCase);
+                    if (!Regex.IsMatch(attrs, @"\bsrc\s*=", RegexOptions.IgnoreCase))
+                    {
+                        attrs += " src=\"" + avatarUri + "\"";
+                    }
+
+                    attrs = Regex.Replace(attrs, @"\bsrcset=([""']).*?\1", string.Empty, RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    attrs = Regex.Replace(attrs, @"\bsrcset=(?![""'])[^\s>]+", string.Empty, RegexOptions.IgnoreCase);
+                    attrs = Regex.Replace(attrs, @"\balt=([""']).*?\1", "alt=\"" + pseudonym + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    attrs = Regex.Replace(attrs, @"\btitle=([""']).*?\1", "title=\"" + pseudonym + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    if (!Regex.IsMatch(attrs, @"\balt\s*=", RegexOptions.IgnoreCase))
+                    {
+                        attrs += " alt=\"" + pseudonym + "\"";
+                    }
+                    if (!Regex.IsMatch(attrs, @"\btitle\s*=", RegexOptions.IgnoreCase))
+                    {
+                        attrs += " title=\"" + pseudonym + "\"";
+                    }
                     attrs = Regex.Replace(
                         attrs,
                         @"\bstyle=([""'])(?<style>.*?)\1",
@@ -146,8 +172,24 @@ namespace ShuiyuanHtmlPrivacyCleaner
                 },
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
 
-            ApplyReplacement(ref text, @"background-image\s*:\s*var\(--sf-img-\d+\)!important;?", string.Empty, RegexOptions.IgnoreCase);
             ApplyReplacement(ref text, @"https?://[^""'\s>]+/user_avatar/[^""'\s>]+", TransparentAvatarDataUri, RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"--sf-img-\d+\s*:\s*url\((?:""data:image/[^""]+""|'data:image/[^']+'|data:image/[^)]+)\)\s*;?", string.Empty, RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"background-image\s*:\s*var\(--sf-img-\d+\)!important;?", string.Empty, RegexOptions.IgnoreCase);
+        }
+
+        private void NeutralizeRawSvgAvatarImages(ref string text)
+        {
+            text = Regex.Replace(
+                text,
+                @"<img\b(?<attrs>[\s\S]{0,1500}?class=(?:""[^""]*\bavatar\b[^""]*""|'[^']*\bavatar\b[^']*'|[^\s>]*\bavatar\b[^\s>]*)[\s\S]{0,1500}?)(?=</a>|</span>|</div>)",
+                delegate (Match match)
+                {
+                    string attrs = match.Groups["attrs"].Value;
+                    string pseudonym = ExtractPseudonymFromAttributes(attrs);
+                    string avatarUri = BuildAnonymousAvatarDataUri(pseudonym);
+                    return "<img src=\"" + avatarUri + "\" class=\"avatar\" width=\"48\" height=\"48\" alt=\"" + pseudonym + "\" title=\"" + pseudonym + "\">";
+                },
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
         }
 
         private void StripUserDataAttributes(ref string text)
@@ -184,6 +226,13 @@ namespace ShuiyuanHtmlPrivacyCleaner
             ApplyReplacement(ref text, @"\s*<button\b[^>]*class=(?:""[^""]*\bquote-toggle\b[^""]*""|'[^']*\bquote-toggle\b[^']*'|[^>]*\bquote-toggle\b[^>]*)[^>]*>[\s\S]*?</button>\s*", string.Empty, RegexOptions.IgnoreCase);
         }
 
+        private void RemoveInteractiveAndRecommendationShell(ref string text)
+        {
+            ApplyReplacement(ref text, @"\s*<div\b[^>]*class=(?:""[^""]*\bmore-topics__container\b[^""]*""|'[^']*\bmore-topics__container\b[^']*'|[^\s>]*\bmore-topics__container\b[^\s>]*)[^>]*>[\s\S]*?(?=</section>)", "\n", RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"\s*<div\b[^>]*class=(?:""[^""]*\btopic-footer-main-buttons\b[^""]*""|'[^']*\btopic-footer-main-buttons\b[^']*'|[^\s>]*\btopic-footer-main-buttons\b[^\s>]*)[^>]*>[\s\S]*?</div>\s*", "\n", RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"\s*<div\b[^>]*class=(?:""[^""]*\bnotifications-button-footer\b[^""]*""|'[^']*\bnotifications-button-footer\b[^']*'|[^\s>]*\bnotifications-button-footer\b[^\s>]*)[^>]*>[\s\S]*?</div>\s*", "\n", RegexOptions.IgnoreCase);
+        }
+
         private void ReplaceSiteTerms(ref string text)
         {
             ReplacePlainAndEncoded(ref text, "shuiyuan.s3.jcloud.sjtu.edu.cn", "anonymous-site");
@@ -211,7 +260,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
 
             text = Regex.Replace(
                 text,
-                @"\bclass=(?<value>[^\s>]+)",
+                @"\bclass=(?![""'])(?<value>[^\s>]+)",
                 delegate (Match match)
                 {
                     return "class=" + SanitizeClassTokens(match.Groups["value"].Value);
@@ -245,6 +294,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
         private void RemoveResidualExternalUrls(ref string text)
         {
             ApplyReplacement(ref text, @"https?://(?:shuiyuan(?:\.s3\.jcloud)?\.sjtu\.edu\.cn|[^""'\s<>]*sjtu\.edu\.cn)[^\s""'<>]*", "#", RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"https?://(?!www\.w3\.org/)[^\s""'<>]+", "#", RegexOptions.IgnoreCase);
         }
 
         private void NormalizeNamesBlocks(ref string text)
@@ -262,6 +312,211 @@ namespace ShuiyuanHtmlPrivacyCleaner
                 RegexOptions.IgnoreCase | RegexOptions.Singleline);
         }
 
+        private void AnnotateAnonymousPosts(ref string text)
+        {
+            text = Regex.Replace(
+                text,
+                @"<div\b(?=[^>]*\bclass=(?:""[^""]*\btopic-post\b[^""]*""|'[^']*\btopic-post\b[^']*'|[^\s>]*\btopic-post\b[^\s>]*))[\s\S]*?(?=<div\b(?=[^>]*\bclass=(?:""[^""]*\btopic-post\b[^""]*""|'[^']*\btopic-post\b[^']*'|[^\s>]*\btopic-post\b[^\s>]*))|<div\b[^>]*class=(?:""[^""]*\btopic-navigation\b[^""]*""|'[^']*\btopic-navigation\b[^']*'|[^\s>]*\btopic-navigation\b[^\s>]*)|\z)",
+                delegate (Match match)
+                {
+                    string post = match.Value;
+                    string pseudonym = FindFirstPseudonym(post);
+                    if (string.IsNullOrEmpty(pseudonym))
+                    {
+                        pseudonym = "匿名用户";
+                    }
+
+                    int index = ExtractPseudonymIndex(pseudonym);
+                    string nameHtml = BuildAnonymousNameBlock(pseudonym);
+
+                    post = Regex.Replace(
+                        post,
+                        @"<div\b(?<attrs>[^>]*\bclass=(?:""[^""]*\bpost-avatar\b[^""]*""|'[^']*\bpost-avatar\b[^']*'|[^\s>]*\bpost-avatar\b[^\s>]*)[^>]*)>",
+                        delegate (Match avatarMatch)
+                        {
+                            string attrs = EnsureAnonymousAvatarAttributes(avatarMatch.Groups["attrs"].Value, pseudonym, index);
+                            return "<div" + attrs + ">";
+                        },
+                        RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                        TimeSpan.FromSeconds(2));
+
+                    post = Regex.Replace(
+                        post,
+                        @"<img\b(?<attrs>[^>]*\bclass=(?:""[^""]*\bavatar\b[^""]*""|'[^']*\bavatar\b[^']*'|[^\s>]*\bavatar\b[^\s>]*)[^>]*)>",
+                        delegate (Match imgMatch)
+                        {
+                            string attrs = EnsureAnonymousAvatarAttributes(imgMatch.Groups["attrs"].Value, pseudonym, index);
+                            return "<img" + attrs + ">";
+                        },
+                        RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                        TimeSpan.FromSeconds(2));
+
+                    if (post.IndexOf("anonymous-avatar-name", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        post = Regex.Replace(
+                            post,
+                            @"(<div\b[^>]*\bclass=(?:""[^""]*\bpost-avatar\b[^""]*""|'[^']*\bpost-avatar\b[^']*'|[^\s>]*\bpost-avatar\b[^\s>]*)[^>]*>[\s\S]*?</a>)",
+                            "$1<div class=\"anonymous-avatar-name\">" + pseudonym + "</div>",
+                            RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                            TimeSpan.FromSeconds(2));
+                    }
+
+                    post = Regex.Replace(
+                        post,
+                        @"(<div\b[^>]*\bclass=(?:""[^""]*\btopic-meta-data\b[^""]*""|'[^']*\btopic-meta-data\b[^']*'|[^\s>]*\btopic-meta-data\b[^\s>]*)[^>]*>)(?!\s*<div\b[^>]*\bclass=(?:""[^""]*\bnames\b[^""]*""|'[^']*\bnames\b[^']*'|[^\s>]*\bnames\b[^\s>]*))",
+                        "$1" + nameHtml,
+                        RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                        TimeSpan.FromSeconds(2));
+
+                    post = Regex.Replace(
+                        post,
+                        @"(<div\s+class=(?:""topic-meta-data""|'topic-meta-data'|topic-meta-data)\s*>)(?!\s*<div\b[^>]*\bclass=(?:""[^""]*\bnames\b[^""]*""|'[^']*\bnames\b[^']*'|[^\s>]*\bnames\b[^\s>]*))",
+                        "$1" + nameHtml,
+                        RegexOptions.IgnoreCase | RegexOptions.Singleline,
+                        TimeSpan.FromSeconds(2));
+
+                    if (post.IndexOf("anonymous-names", StringComparison.OrdinalIgnoreCase) < 0)
+                    {
+                        int metaIndex = post.IndexOf("<div class=topic-meta-data>", StringComparison.OrdinalIgnoreCase);
+                        if (metaIndex >= 0)
+                        {
+                            int insertAt = metaIndex + "<div class=topic-meta-data>".Length;
+                            post = post.Insert(insertAt, nameHtml);
+                        }
+                    }
+
+                    return post;
+                },
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+        }
+
+        private static string BuildAnonymousNameBlock(string pseudonym)
+        {
+            return "<div class=\"names anonymous-names\"><span class=\"first full-name\"><a href=\"#\" aria-label=\"" + pseudonym + "\" tabindex=\"0\">" + pseudonym + "</a></span></div>";
+        }
+
+        private static string EnsureAnonymousAvatarAttributes(string attrs, string pseudonym, int index)
+        {
+            string value = string.IsNullOrWhiteSpace(pseudonym) ? "匿名用户" : pseudonym;
+            string updated = attrs;
+
+            if (Regex.IsMatch(updated, @"\bdata-anon-user\s*=", RegexOptions.IgnoreCase))
+            {
+                updated = Regex.Replace(updated, @"\bdata-anon-user=([""']).*?\1", "data-anon-user=\"" + value + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                updated = Regex.Replace(updated, @"\bdata-anon-user=(?![""'])[^\s>]+", "data-anon-user=\"" + value + "\"", RegexOptions.IgnoreCase);
+            }
+            else
+            {
+                updated += " data-anon-user=\"" + value + "\"";
+            }
+
+            if (index > 0)
+            {
+                if (Regex.IsMatch(updated, @"\bdata-anon-index\s*=", RegexOptions.IgnoreCase))
+                {
+                    updated = Regex.Replace(updated, @"\bdata-anon-index=([""']).*?\1", "data-anon-index=\"" + index.ToString() + "\"", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+                    updated = Regex.Replace(updated, @"\bdata-anon-index=(?![""'])[^\s>]+", "data-anon-index=\"" + index.ToString() + "\"", RegexOptions.IgnoreCase);
+                }
+                else
+                {
+                    updated += " data-anon-index=\"" + index.ToString() + "\"";
+                }
+            }
+
+            updated = Regex.Replace(
+                updated,
+                @"\bclass=(?<quote>[""'])(?<value>.*?)\k<quote>",
+                delegate (Match match)
+                {
+                    string quote = match.Groups["quote"].Value;
+                    string classValue = match.Groups["value"].Value;
+                    if (classValue.IndexOf("anonymous-post-avatar", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        classValue.IndexOf("post-avatar", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        classValue += " anonymous-post-avatar";
+                    }
+                    return "class=" + quote + classValue + quote;
+                },
+                RegexOptions.IgnoreCase | RegexOptions.Singleline);
+
+            updated = Regex.Replace(
+                updated,
+                @"\bclass=(?![""'])(?<value>[^\s>]+)",
+                delegate (Match match)
+                {
+                    string classValue = match.Groups["value"].Value;
+                    if (classValue.IndexOf("anonymous-post-avatar", StringComparison.OrdinalIgnoreCase) < 0 &&
+                        classValue.IndexOf("post-avatar", StringComparison.OrdinalIgnoreCase) >= 0)
+                    {
+                        classValue += " anonymous-post-avatar";
+                    }
+                    return "class=\"" + classValue + "\"";
+                },
+                RegexOptions.IgnoreCase);
+
+            return updated;
+        }
+
+        private static string FindFirstPseudonym(string text)
+        {
+            Match headingMatch = Regex.Match(text, @"<h2\b[\s\S]{0,500}?用户\d+[\s\S]{0,500}?</h2>", RegexOptions.IgnoreCase);
+            if (headingMatch.Success)
+            {
+                Match aliasInHeading = Regex.Match(headingMatch.Value, @"用户\d+", RegexOptions.IgnoreCase);
+                if (aliasInHeading.Success)
+                {
+                    return aliasInHeading.Value;
+                }
+            }
+
+            int cookedIndex = IndexOfRegexStatic(text, @"<div\b[^>]*\bclass=(?:""[^""]*\bcooked\b[^""]*""|'[^']*\bcooked\b[^']*'|[^\s>]*\bcooked\b[^\s>]*)", RegexOptions.IgnoreCase);
+            string header = cookedIndex > 0 ? text.Substring(0, cookedIndex) : text;
+            Match aliasMatch = Regex.Match(header, @"用户\d+", RegexOptions.IgnoreCase);
+            return aliasMatch.Success ? aliasMatch.Value : string.Empty;
+        }
+
+        private static string ExtractPseudonymFromAttributes(string attrs)
+        {
+            Match match = Regex.Match(attrs, @"\bdata-anon-user=([""'])(?<value>用户\d+|匿名用户)\1", RegexOptions.IgnoreCase);
+            if (!match.Success)
+            {
+                match = Regex.Match(attrs, @"\b(?:alt|title|aria-label)=([""'])(?<value>用户\d+|匿名用户)\1", RegexOptions.IgnoreCase);
+            }
+
+            return match.Success ? match.Groups["value"].Value : "匿名用户";
+        }
+
+        private static int ExtractPseudonymIndex(string pseudonym)
+        {
+            Match match = Regex.Match(pseudonym ?? string.Empty, @"用户(?<index>\d+)", RegexOptions.IgnoreCase);
+            if (match.Success && int.TryParse(match.Groups["index"].Value, out int index))
+            {
+                return index;
+            }
+
+            return 0;
+        }
+
+        private static string BuildAnonymousAvatarDataUri(string pseudonym)
+        {
+            int index = ExtractPseudonymIndex(pseudonym);
+            string label = index > 0 ? index.ToString() : "?";
+            string color = AnonymousAvatarPalette[(Math.Max(index, 1) - 1) % AnonymousAvatarPalette.Length];
+            string svg =
+                "<svg xmlns=\"http://www.w3.org/2000/svg\" width=\"96\" height=\"96\" viewBox=\"0 0 96 96\">" +
+                "<rect width=\"96\" height=\"96\" rx=\"48\" fill=\"" + color + "\"/>" +
+                "<circle cx=\"70\" cy=\"24\" r=\"12\" fill=\"rgba(255,255,255,.22)\"/>" +
+                "<text x=\"48\" y=\"57\" text-anchor=\"middle\" font-family=\"Arial,Microsoft YaHei,sans-serif\" font-size=\"34\" font-weight=\"700\" fill=\"#fff\">" + label + "</text>" +
+                "</svg>";
+            return "data:image/svg+xml;charset=utf-8," + Uri.EscapeDataString(svg);
+        }
+
+        private static int IndexOfRegexStatic(string text, string pattern, RegexOptions options)
+        {
+            Match match = Regex.Match(text, pattern, options);
+            return match.Success ? match.Index : -1;
+        }
+
         private void InjectAnonymousDiscourseStyle(ref string text)
         {
             const string marker = "anonymous-discourse-sanitizer";
@@ -273,11 +528,20 @@ namespace ShuiyuanHtmlPrivacyCleaner
             string styleBlock =
                 "<style id=\"" + marker + "\">" +
                 ".anonymous-site-brand{display:inline-flex;align-items:center;min-height:36px;font-size:20px;font-weight:700;color:#2f4858;}" +
-                "img.avatar{background:#eef2f6!important;border-radius:50%!important;border:1px solid #d7dfe8!important;}" +
+                "img.avatar{background:#eef2f6!important;border-radius:50%!important;border:1px solid #d7dfe8!important;object-fit:cover!important;}" +
+                ".post-avatar.anonymous-post-avatar{display:flex!important;flex-direction:column!important;align-items:center!important;gap:4px!important;min-width:58px!important;}" +
+                ".anonymous-avatar-name{font-size:12px!important;line-height:1.2!important;color:#52616f!important;max-width:64px!important;text-align:center!important;white-space:nowrap!important;overflow:hidden!important;text-overflow:ellipsis!important;}" +
+                ".topic-meta-data .anonymous-names{display:block!important;margin-bottom:2px!important;}" +
                 ".names .second.username{display:none!important;}" +
                 ".names .first.full-name a{color:inherit!important;pointer-events:none!important;text-decoration:none!important;}" +
                 "a.trigger-user-card,a.poster-avatar,a.main-avatar,a.mention,a.lightbox,a.back{pointer-events:none!important;}" +
                 "a.trigger-user-card[href],a.poster-avatar[href],a.main-avatar[href],a.mention[href],a.lightbox[href],a.back[href]{cursor:default!important;}" +
+                ".topic-body,.contents,.cooked,.regular{max-width:100%!important;overflow-wrap:anywhere!important;}" +
+                ".cooked img:not(.avatar),.cooked video,.cooked canvas,.cooked iframe,.onebox,.lightbox-wrapper,.aspect-image{max-width:100%!important;height:auto!important;}" +
+                ".topic-footer-main-buttons,.topic-footer-buttons{display:flex!important;flex-wrap:wrap!important;gap:8px!important;align-items:center!important;max-width:100%!important;}" +
+                ".suggested-topics,.more-topics,.more-topics__container,.topic-map{clear:both!important;margin-left:0!important;max-width:min(100%,1100px)!important;overflow-x:auto!important;}" +
+                ".suggested-topics .topic-list,.more-topics .topic-list{width:100%!important;table-layout:auto!important;}" +
+                ".suggested-topics .topic-list td,.suggested-topics .topic-list th,.more-topics .topic-list td,.more-topics .topic-list th{white-space:normal!important;overflow-wrap:anywhere!important;}" +
                 "</style>";
 
             int headClose = IndexOfRegex(text, @"</head>", RegexOptions.IgnoreCase);
@@ -446,12 +710,38 @@ namespace ShuiyuanHtmlPrivacyCleaner
             List<string> keys = new List<string>(replacements.Keys);
             keys.Sort(delegate (string left, string right) { return right.Length.CompareTo(left.Length); });
 
+            List<string> protectedDataUrls = ProtectDataUrls(ref text);
             string pattern = string.Join("|", keys.ConvertAll(Regex.Escape).ToArray());
             text = Regex.Replace(
                 text,
                 pattern,
                 delegate (Match match) { return replacements[match.Value]; },
                 RegexOptions.IgnoreCase);
+            RestoreDataUrls(ref text, protectedDataUrls);
+        }
+
+        private static List<string> ProtectDataUrls(ref string text)
+        {
+            List<string> values = new List<string>();
+            text = Regex.Replace(
+                text,
+                @"data:[^""'\s<>]+",
+                delegate (Match match)
+                {
+                    int index = values.Count;
+                    values.Add(match.Value);
+                    return "__SHUIYUAN_PROTECTED_DATA_URI_" + index.ToString() + "__";
+                },
+                RegexOptions.IgnoreCase);
+            return values;
+        }
+
+        private static void RestoreDataUrls(ref string text, List<string> values)
+        {
+            for (int i = 0; i < values.Count; i++)
+            {
+                text = text.Replace("__SHUIYUAN_PROTECTED_DATA_URI_" + i.ToString() + "__", values[i]);
+            }
         }
 
         private static void ReplacePlainAndEncoded(ref string text, string oldValue, string newValue)
