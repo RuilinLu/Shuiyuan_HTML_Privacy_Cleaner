@@ -1,0 +1,13 @@
+bin/
+obj/
+publish/
+build/
+dist/
+Figure/*.png
+Figure/*.ico
+Code/Figure/*.png
+Code/Figure/*.ico
+*.user
+*.suo
+*.pdb
+*.log

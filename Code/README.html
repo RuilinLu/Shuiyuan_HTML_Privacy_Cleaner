@@ -1,0 +1,108 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>水源 HTML 隐私清理工具 V5 说明</title>
+  <style>
+    html, body { margin: 0; padding: 0; background: #f5f7fa; color: #1f2937; font-family: "Microsoft YaHei UI", "Segoe UI", sans-serif; line-height: 1.7; }
+    body { padding: 32px 18px 56px; }
+    main { max-width: 980px; margin: 0 auto; background: #fff; border: 1px solid #d8dee8; border-radius: 10px; padding: 28px 30px; box-shadow: 0 8px 24px rgba(15, 23, 42, 0.06); }
+    h1, h2 { color: #102133; line-height: 1.35; }
+    h1 { margin-top: 0; font-size: 32px; }
+    h2 { margin-top: 30px; font-size: 22px; border-top: 1px solid #edf0f5; padding-top: 22px; }
+    p, li { font-size: 16px; }
+    code, pre { font-family: Consolas, monospace; }
+    pre { background: #0f172a; color: #e5e7eb; padding: 14px 16px; border-radius: 8px; overflow: auto; }
+    ul, ol { padding-left: 22px; }
+    .note { background: #f7fbfa; border-left: 4px solid #57b8ad; padding: 12px 14px; border-radius: 6px; }
+    .mode { background: #f8fafc; border: 1px solid #e5e7eb; border-radius: 8px; padding: 12px 14px; margin: 12px 0; }
+  </style>
+</head>
+<body>
+  <main>
+    <h1>水源 HTML 隐私清理工具 V5</h1>
+    <p>这是一个可完全离线运行的 Windows 工具，用来清理用 SingleFile 保存的水源/Discourse HTML 快照。V5 的全匿名模式直接在原始 SingleFile/Discourse HTML 上就地匿名化，尽量保留原版论坛布局，而不是提取发言后重写一个新页面。</p>
+
+    <h2>能清理什么</h2>
+    <ul>
+      <li>SingleFile 保存时间注释、可见水印、隐藏低透明度整页水印</li>
+      <li>右上角当前登录用户头像、账号入口、<code>currentUser</code>、未读/新帖计数、阅读状态</li>
+      <li>Thunderbit、沉浸式翻译等扩展残留</li>
+      <li>CSRF token、主题激活、tracking、用户手动填写的审核关键词</li>
+      <li>全匿名模式下的站点域名、站点品牌、外链、预加载 JSON、公开用户标识、头像、徽章、头衔和 flair</li>
+    </ul>
+
+    <h2>两种模式</h2>
+    <div class="mode">
+      <strong>仅清除当前保存者 / 登录者信息</strong>
+      <p>只删除保存者自己的水印、登录态、头像、ID、昵称和保存痕迹。这个模式会保留页面原有站点名称、帖子里其他公开用户、公开头像、用户徽章、公开链接和论坛结构。</p>
+    </div>
+    <div class="mode">
+      <strong>全匿名模式</strong>
+      <p>在原始 Discourse/SingleFile 框架内就地改写，把同一用户的昵称、用户名、@用户名、用户链接和头像信息尽量统一替换为同一个 <code>用户1</code>、<code>用户2</code>，并删除用户徽章、站点外链和隐藏预加载数据。</p>
+    </div>
+
+    <h2>界面区域</h2>
+    <ol>
+      <li><strong>输入 HTML</strong>：选择原始 SingleFile 保存的 <code>.html</code> 或 <code>.htm</code> 文件。</li>
+      <li><strong>输出 HTML</strong>：选择清理后的保存位置，切换模式后会自动建议文件名。</li>
+      <li><strong>审核关键词</strong>：填写用户名、ID、头像编号、时间戳、昵称或可疑字符串。</li>
+      <li><strong>模式</strong>：选择个人模式或全匿名模式。</li>
+      <li><strong>仅分析</strong>：只扫描输入文件，不写新 HTML。</li>
+      <li><strong>清理并审核</strong>：执行清理，写出 HTML，并生成审核报告。</li>
+      <li><strong>打开输出位置</strong>：在资源管理器里定位输出文件。</li>
+      <li><strong>允许覆盖输出文件</strong>：勾选后允许覆盖已有结果。</li>
+      <li><strong>报告区</strong>：显示清理前检测、实际移除和清理后审核结果。</li>
+      <li><strong>底部状态栏</strong>：显示当前阶段，例如就绪、清理中、清理完成或出错。</li>
+    </ol>
+
+    <h2>进度窗口</h2>
+    <div class="note">绿色进度条是真实百分比，只从左到右走一遍；窗口会显示当前百分比、处理阶段和已运行秒数。全匿名模式处理大文件时可能较慢，但界面会持续显示进度。</div>
+
+    <h2>推荐流程</h2>
+    <ol>
+      <li>在 Edge 中打开目标页面，并用 SingleFile 保存为单个 HTML。</li>
+      <li>打开对应架构的 <code>ShuiyuanHtmlPrivacyCleaner.exe</code>。</li>
+      <li>选择输入 HTML 和输出 HTML。</li>
+      <li>选择清理模式，并按需填写审核关键词。</li>
+      <li>先点 <code>仅分析</code>，再点 <code>清理并审核</code>。</li>
+      <li>打开输出 HTML 确认页面能正常显示，只分享清理后的文件和报告。</li>
+    </ol>
+
+    <h2>命令行模式</h2>
+    <pre><code>.\ShuiyuanHtmlPrivacyCleaner.exe --clean "input.html" "output.html" `
+  --mode full `
+  --term "用户名" `
+  --term "用户ID" `
+  --report "report.txt" `
+  --overwrite</code></pre>
+    <p>可用模式为 <code>personal</code> 和 <code>full</code>。路径中有空格时必须加英文双引号。</p>
+
+    <h2>图标与源码</h2>
+    <ul>
+      <li><code>Figure/shuiyuan_symbol_app_icon.svg</code>：生成 EXE 图标。</li>
+      <li><code>Figure/shuiyuan_html_watermark_tool_logo.svg</code>：生成程序窗口左上角 logo。</li>
+      <li><code>Code</code>：完整开源源码。</li>
+      <li><code>dist/win-x64</code>、<code>dist/win-x86</code>、<code>dist/win-arm64</code>：离线运行版 EXE。</li>
+    </ul>
+
+    <h2>V5 验收</h2>
+    <ul>
+      <li>Anthropic 样本全匿名：Edge 实际打开后 <code>topic-post=21</code>，<code>cooked=21</code>，页面不是空白。</li>
+      <li>国赛样本全匿名：Edge 实际打开后 <code>topic-post=62</code>，<code>cooked=62</code>，页面不是空白。</li>
+      <li>全匿名输出中保存者关键词、站点域名、公开用户标识、用户徽章节点、隐藏预加载数据、站点外链、CSRF、SingleFile 保存时间、水印、隐水印均审核为 0。</li>
+      <li>个人模式按设计保留公开站点和其他用户信息，但会清除保存者个人信息和水印。</li>
+    </ul>
+
+    <h2>版本命名</h2>
+    <ul>
+      <li><code>APP/V1</code>：第一版个人信息清理工具。</li>
+      <li><code>APP/V2</code>：加入双模式雏形。</li>
+      <li><code>APP/V3</code>：加入进度窗口。</li>
+      <li><code>APP/V4</code>：修复中文和进度体验，曾使用静态重建方案。</li>
+      <li><code>APP/V5</code>：全匿名改为在原始 Discourse/SingleFile 框架内就地匿名化，并修复空白页问题。</li>
+    </ul>
+  </main>
+</body>
+</html>
