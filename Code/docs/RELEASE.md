@@ -13,7 +13,7 @@ The recommended public release is one GitHub Release named `v7.0.0` with three E
 
 ## Pre-Release Checklist
 
-1. Build three architectures with `.\build.ps1`.
+1. Build three architectures with `cd Code; .\build.ps1`.
 2. Confirm `CHECKSUMS-SHA256.txt` was regenerated.
 3. Run x64 command-line cleaning on a private local sample.
 4. Run x86 command-line cleaning on the same private local sample.
@@ -27,9 +27,9 @@ The recommended public release is one GitHub Release named `v7.0.0` with three E
 
 Upload:
 
-- `dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
 - `CHECKSUMS-SHA256.txt`
 
 Suggested asset names:
@@ -77,4 +77,3 @@ Use an `.html` snapshot saved by SingleFile. The most-tested capture workflow is
 
 See `CHECKSUMS-SHA256.txt`.
 ```
-

@@ -23,15 +23,16 @@ The source code lives under `Code/src` in release packages. The main classes are
 Install .NET SDK 9 on Windows, then run:
 
 ```powershell
+cd Code
 .\build.ps1
 ```
 
 This creates:
 
-- `dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
-- `CHECKSUMS-SHA256.txt`
+- `Code/dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/CHECKSUMS-SHA256.txt`
 
 The build uses:
 
@@ -57,7 +58,7 @@ The generator source is:
 Code/tools/avatar_pack_generator
 ```
 
-If the pack is missing, `build.ps1` can rebuild it with npm. Runtime use is fully offline; the EXE does not download identities or avatars.
+The generated pack is not committed to `main` because it is larger than GitHub's normal 100 MB file limit. It is attached to the GitHub Release as an optional asset. If the pack is missing, `Code/build.ps1` can rebuild it with npm. Runtime use is fully offline; the EXE does not download identities or avatars.
 
 ## Brand Assets
 
@@ -83,4 +84,3 @@ Avoid rules that delete broad containers unless you have verified the HTML struc
 ## Repository Hygiene
 
 Do not commit private samples. Keep generated private validation files outside the repository. Release EXEs can be committed because this repository is intended to provide direct downloadable offline binaries, but private HTML snapshots and reports must stay local.
-

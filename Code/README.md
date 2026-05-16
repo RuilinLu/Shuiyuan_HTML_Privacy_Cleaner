@@ -135,17 +135,18 @@ ShuiyuanHtmlPrivacyCleaner.exe --clean input.html output_full.html --mode full -
 需要 Windows 和 .NET SDK 9。
 
 ```powershell
+cd Code
 .\build.ps1
 ```
 
 构建完成后输出：
 
-- `dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
-- `dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
-- `CHECKSUMS-SHA256.txt`
+- `Code/dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-x86/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/dist/win-arm64/ShuiyuanHtmlPrivacyCleaner.exe`
+- `Code/CHECKSUMS-SHA256.txt`
 
-项目主体是 C# / WinForms。`tools/avatar_pack_generator` 用于生成内置匿名身份包，`tools/GenerateBrandAssets.ps1` 用于从 SVG 生成 Windows 图标资源。
+项目主体是 C# / WinForms。`Code/tools/avatar_pack_generator` 用于生成内置匿名身份包，`Code/tools/GenerateBrandAssets.ps1` 用于从 SVG 生成 Windows 图标资源。
 
 ## 验收重点
 
