@@ -4,12 +4,26 @@ $root = Split-Path -Parent $MyInvocation.MyCommand.Path
 $project = Join-Path $root "ShuiyuanHtmlPrivacyCleaner.csproj"
 $dist = Join-Path $root "dist"
 $assetScript = Join-Path $root "tools\GenerateBrandAssets.ps1"
+$identityPack = Join-Path $root "assets\anonymous_identity_pack.jsonl.gz"
+$identityGenerator = Join-Path $root "tools\avatar_pack_generator"
 $windowsPowerShell = "C:\Windows\System32\WindowsPowerShell\v1.0\powershell.exe"
 
 New-Item -ItemType Directory -Force -Path $dist | Out-Null
 & $windowsPowerShell -STA -ExecutionPolicy Bypass -File $assetScript
 if ($LASTEXITCODE -ne 0) {
   throw "Asset generation failed with exit code $LASTEXITCODE"
+}
+
+if (-not (Test-Path -LiteralPath $identityPack)) {
+  Write-Host "Anonymous identity pack is missing. Building it with npm..."
+  & npm.cmd install --prefix $identityGenerator
+  if ($LASTEXITCODE -ne 0) {
+    throw "npm install failed with exit code $LASTEXITCODE"
+  }
+  & npm.cmd run build --prefix $identityGenerator
+  if ($LASTEXITCODE -ne 0) {
+    throw "anonymous identity pack generation failed with exit code $LASTEXITCODE"
+  }
 }
 
 $rids = @("win-x64", "win-x86", "win-arm64")
@@ -21,6 +35,8 @@ foreach ($rid in $rids) {
     --self-contained true `
     -p:PublishSingleFile=true `
     -p:EnableCompressionInSingleFile=true `
+    -p:DebugType=None `
+    -p:DebugSymbols=false `
     -o $out
   if ($LASTEXITCODE -ne 0) {
     throw "dotnet publish failed for $rid with exit code $LASTEXITCODE"

@@ -1,0 +1,8 @@
+*.exe binary
+*.ico binary
+*.png binary
+*.gz binary
+Code/assets/anonymous_identity_pack.jsonl.gz linguist-generated=true
+README.html linguist-documentation=true
+Code/README.html linguist-documentation=true
+docs/** linguist-documentation=true

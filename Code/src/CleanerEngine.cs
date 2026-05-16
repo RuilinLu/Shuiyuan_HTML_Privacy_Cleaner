@@ -8,6 +8,20 @@ using System.Text.RegularExpressions;
 
 namespace ShuiyuanHtmlPrivacyCleaner
 {
+    internal enum ReportVerbosity
+    {
+        Friendly = 0,
+        Standard = 1,
+        Technical = 2,
+    }
+
+    internal enum ReportLanguage
+    {
+        SimplifiedChinese = 0,
+        TraditionalChinese = 1,
+        English = 2,
+    }
+
     internal sealed class CleaningResult
     {
         public string InputPath;
@@ -15,6 +29,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
         public string InputEncoding;
         public int OriginalChars;
         public int CleanedChars;
+        public CleaningMode Mode;
+        public bool IsAnalysisOnly;
         public readonly List<ReportItem> Items = new List<ReportItem>();
         public readonly List<AuditItem> Audits = new List<AuditItem>();
         public readonly List<string> ExtractedTerms = new List<string>();
@@ -24,53 +40,205 @@ namespace ShuiyuanHtmlPrivacyCleaner
 
         public string ToDisplayText()
         {
+            return ToDisplayText(ReportVerbosity.Standard, ReportLanguage.SimplifiedChinese);
+        }
+
+        public string ToDisplayText(ReportVerbosity verbosity, ReportLanguage language)
+        {
+            if (verbosity == ReportVerbosity.Friendly)
+            {
+                return ToFriendlyText(language);
+            }
+            if (verbosity == ReportVerbosity.Technical)
+            {
+                return ToTechnicalText(language);
+            }
+            return ToStandardText(language);
+        }
+
+        private string ToFriendlyText(ReportLanguage language)
+        {
             StringBuilder sb = new StringBuilder();
-            sb.AppendLine("输入文件: " + InputPath);
-            sb.AppendLine("输出文件: " + OutputPath);
-            sb.AppendLine("读取编码: " + InputEncoding);
-            sb.AppendLine("字符数: " + OriginalChars + " -> " + CleanedChars);
+            AppendTitle(sb, language, IsAnalysisOnly ? "分析结果" : "清理结果", IsAnalysisOnly ? "Analysis Result" : "Cleaning Result");
+            AppendLine(sb, language, "1. 文件与模式", "1. File and Mode");
+            AppendFileInfo(sb, language);
+            AppendModeExplanation(sb, language);
+            if (IsAnalysisOnly)
+            {
+                AppendLine(sb, language, "   本次只扫描原文件，没有写出新文件，也没有删除任何内容。", "   This run only scanned the input file. It did not write or modify anything.");
+            }
             sb.AppendLine();
 
-            sb.AppendLine("清理前检测到的信息");
+            AppendLine(sb, language, "2. 清理前发现的风险", "2. Findings Before Cleaning");
+            AppendRiskSummary(sb, language);
+            sb.AppendLine();
+
+            if (!IsAnalysisOnly)
+            {
+                AppendLine(sb, language, "3. 本次实际处理", "3. Actions Performed");
+                foreach (ReportItem item in Items)
+                {
+                    string state = item.After == 0 ? "已清除" : "仍需复核";
+                    string stateEn = item.After == 0 ? "removed" : "needs review";
+                    AppendLine(sb, language,
+                        "   " + item.Name + ": 清理前 " + item.Before + "，已处理 " + item.Removed + "，清理后 " + item.After + "（" + state + "）",
+                        "   " + item.Name + ": before " + item.Before + ", changed " + item.Removed + ", after " + item.After + " (" + stateEn + ")");
+                }
+                sb.AppendLine();
+            }
+
+            AppendLine(sb, language, IsAnalysisOnly ? "3. 审核结论" : "4. 清理后审核结论", IsAnalysisOnly ? "3. Review" : "4. Review After Cleaning");
+            AppendAuditSummary(sb, language);
+            AppendWarnings(sb, language);
+            return ConvertLanguage(sb.ToString(), language);
+        }
+
+        private string ToStandardText(ReportLanguage language)
+        {
+            StringBuilder sb = new StringBuilder();
+            AppendTitle(sb, language, IsAnalysisOnly ? "HTML 隐私分析报告" : "HTML 隐私清理报告", IsAnalysisOnly ? "HTML Privacy Analysis Report" : "HTML Privacy Cleaning Report");
+            AppendLine(sb, language, "1. 基本信息", "1. Basic Information");
+            AppendFileInfo(sb, language);
+            AppendModeExplanation(sb, language);
+            sb.AppendLine();
+
+            AppendLine(sb, language, "2. 清理前检测到的信息", "2. Detected Before Cleaning");
             foreach (ReportItem item in Items)
             {
-                sb.AppendLine("- " + item.Name + ": " + item.Before + FormatDetail(item.BeforeDetail));
+                AppendLine(sb, language, "   " + item.Name + ": " + item.Before + FormatDetail(item.BeforeDetail), "   " + item.Name + ": " + item.Before + FormatDetail(item.BeforeDetail));
             }
-            sb.AppendLine("- NTFS 数据流: " + JoinOrNone(BeforeStreams));
+            AppendLine(sb, language, "   NTFS 数据流: " + JoinOrNone(BeforeStreams, language), "   NTFS streams: " + JoinOrNone(BeforeStreams, language));
             if (ExtractedTerms.Count > 0)
             {
-                sb.AppendLine("- 从 currentUser 提取到的待审核关键词: " + string.Join(", ", ExtractedTerms.ToArray()));
+                AppendLine(sb, language, "   从 currentUser 提取到的待审核关键词: " + string.Join(", ", ExtractedTerms.ToArray()), "   Extra terms extracted from currentUser: " + string.Join(", ", ExtractedTerms.ToArray()));
             }
             else
             {
-                sb.AppendLine("- 从 currentUser 提取到的待审核关键词: 0");
+                AppendLine(sb, language, "   从 currentUser 提取到的待审核关键词: 0", "   Extra terms extracted from currentUser: 0");
             }
             sb.AppendLine();
 
-            sb.AppendLine("实际移除或改写");
-            foreach (ReportItem item in Items)
+            if (IsAnalysisOnly)
             {
-                sb.AppendLine("- " + item.Name + ": " + item.Removed + FormatDetail(item.ActionDetail));
+                AppendLine(sb, language, "3. 操作说明", "3. Operation Note");
+                AppendLine(sb, language, "   这是“仅分析”结果，因此没有执行清理，也不会显示“已移除多少”。请点击“清理并审核”生成新 HTML。", "   This is an analysis-only result. No cleaning was performed. Use Clean and Review to create a cleaned HTML file.");
             }
-            sb.AppendLine();
-
-            sb.AppendLine("清理后审核结果");
-            foreach (AuditItem audit in Audits)
+            else
             {
-                sb.AppendLine("- " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail));
-            }
-            sb.AppendLine("- NTFS 数据流: " + JoinOrNone(AfterStreams));
-
-            if (Warnings.Count > 0)
-            {
-                sb.AppendLine();
-                sb.AppendLine("注意");
-                foreach (string warning in Warnings)
+                AppendLine(sb, language, "3. 实际移除或改写", "3. Removed or Rewritten");
+                foreach (ReportItem item in Items)
                 {
-                    sb.AppendLine("- " + warning);
+                    AppendLine(sb, language, "   " + item.Name + ": " + item.Removed + FormatDetail(item.ActionDetail), "   " + item.Name + ": " + item.Removed + FormatDetail(item.ActionDetail));
                 }
             }
-            return sb.ToString();
+            sb.AppendLine();
+
+            AppendLine(sb, language, IsAnalysisOnly ? "4. 分析后审核结果" : "4. 清理后审核结果", IsAnalysisOnly ? "4. Review Result" : "4. Review After Cleaning");
+            foreach (AuditItem audit in Audits)
+            {
+                AppendLine(sb, language, "   " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail), "   " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail));
+            }
+            AppendLine(sb, language, "   NTFS 数据流: " + JoinOrNone(AfterStreams, language), "   NTFS streams: " + JoinOrNone(AfterStreams, language));
+
+            AppendWarnings(sb, language);
+            return ConvertLanguage(sb.ToString(), language);
+        }
+
+        private string ToTechnicalText(ReportLanguage language)
+        {
+            StringBuilder sb = new StringBuilder();
+            AppendTitle(sb, language, "专业明细", "Technical Details");
+            AppendFileInfo(sb, language);
+            AppendModeExplanation(sb, language);
+            sb.AppendLine();
+
+            AppendLine(sb, language, "清理前检测到的信息", "Detected Before Cleaning");
+            foreach (ReportItem item in Items)
+            {
+                AppendLine(sb, language, "- " + item.Name + ": " + item.Before + FormatDetail(item.BeforeDetail), "- " + item.Name + ": " + item.Before + FormatDetail(item.BeforeDetail));
+            }
+            AppendLine(sb, language, "- NTFS 数据流: " + JoinOrNone(BeforeStreams, language), "- NTFS streams: " + JoinOrNone(BeforeStreams, language));
+            AppendLine(sb, language, "- 从 currentUser 提取到的待审核关键词: " + (ExtractedTerms.Count == 0 ? "0" : string.Join(", ", ExtractedTerms.ToArray())), "- Extra terms extracted from currentUser: " + (ExtractedTerms.Count == 0 ? "0" : string.Join(", ", ExtractedTerms.ToArray())));
+            sb.AppendLine();
+
+            AppendLine(sb, language, IsAnalysisOnly ? "仅分析模式：没有执行移除" : "实际移除或改写", IsAnalysisOnly ? "Analysis-only mode: no removal was performed" : "Removed or Rewritten");
+            if (!IsAnalysisOnly)
+            {
+                foreach (ReportItem item in Items)
+                {
+                    AppendLine(sb, language, "- " + item.Name + ": " + item.Removed + FormatDetail(item.ActionDetail), "- " + item.Name + ": " + item.Removed + FormatDetail(item.ActionDetail));
+                }
+            }
+            sb.AppendLine();
+
+            AppendLine(sb, language, IsAnalysisOnly ? "分析后审核结果" : "清理后审核结果", IsAnalysisOnly ? "Review Result" : "Review After Cleaning");
+            foreach (AuditItem audit in Audits)
+            {
+                AppendLine(sb, language, "- " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail), "- " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail));
+            }
+            AppendLine(sb, language, "- NTFS 数据流: " + JoinOrNone(AfterStreams, language), "- NTFS streams: " + JoinOrNone(AfterStreams, language));
+            AppendWarnings(sb, language);
+            return ConvertLanguage(sb.ToString(), language);
+        }
+
+        private void AppendFileInfo(StringBuilder sb, ReportLanguage language)
+        {
+            AppendLine(sb, language, "   输入文件: " + InputPath, "   Input file: " + InputPath);
+            AppendLine(sb, language, "   输出文件: " + (string.IsNullOrEmpty(OutputPath) ? "未生成（仅分析）" : OutputPath), "   Output file: " + (string.IsNullOrEmpty(OutputPath) ? "not created (analysis only)" : OutputPath));
+            AppendLine(sb, language, "   读取编码: " + InputEncoding, "   Encoding: " + InputEncoding);
+            AppendLine(sb, language, "   字符数: " + OriginalChars + " -> " + CleanedChars, "   Characters: " + OriginalChars + " -> " + CleanedChars);
+        }
+
+        private void AppendModeExplanation(StringBuilder sb, ReportLanguage language)
+        {
+            if (Mode == CleaningMode.FullAnonymous)
+            {
+                AppendLine(sb, language, "   模式: 全匿名。会移除保存者信息，并继续匿名化公开用户、徽章/头衔、站点名称、站点外链和隐藏预加载数据。", "   Mode: Full anonymous. It removes saver information and anonymizes public users, badges/titles, site branding, site links, and hidden preload data.");
+            }
+            else
+            {
+                AppendLine(sb, language, "   模式: 仅清除当前保存者。会移除登录态、水印和保存者痕迹；公开帖子里的站点名称和其他用户信息会保留。", "   Mode: Personal only. It removes logged-in state, watermarks, and saver traces; public site names and other users may remain.");
+            }
+        }
+
+        private void AppendRiskSummary(StringBuilder sb, ReportLanguage language)
+        {
+            foreach (ReportItem item in Items)
+            {
+                if (item.Before <= 0)
+                {
+                    continue;
+                }
+                AppendLine(sb, language, "   发现 " + item.Before + " 处“" + item.Name + "”。" + DescribeItem(item.Name, language), "   Found " + item.Before + " item(s): " + item.Name + ". " + DescribeItem(item.Name, language));
+            }
+        }
+
+        private void AppendAuditSummary(StringBuilder sb, ReportLanguage language)
+        {
+            int remaining = 0;
+            foreach (AuditItem audit in Audits)
+            {
+                if (audit.AfterCount > 0)
+                {
+                    remaining++;
+                }
+            }
+
+            if (remaining == 0)
+            {
+                AppendLine(sb, language, "   所有自动审核项均为 0。对已知水印、登录态、保存者痕迹和当前模式要求检查的隐私项，未检出残留。", "   All automatic review checks are zero. No known watermark, logged-in state, saver trace, or required privacy residue was detected.");
+            }
+            else
+            {
+                AppendLine(sb, language, "   有 " + remaining + " 类审核项仍有命中。请看下面明细；如果是“仅清除当前保存者”模式，站点和其他公开用户信息保留是预期行为。", "   " + remaining + " review category/categories still have hits. In personal-only mode, public site and other-user information can remain by design.");
+            }
+
+            foreach (AuditItem audit in Audits)
+            {
+                string status = audit.AfterCount == 0 ? "通过" : "需复核";
+                string statusEn = audit.AfterCount == 0 ? "pass" : "review";
+                AppendLine(sb, language, "   [" + status + "] " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail), "   [" + statusEn + "] " + audit.Name + ": " + audit.AfterCount + FormatDetail(audit.Detail));
+            }
         }
 
         private static string FormatDetail(string detail)
@@ -78,9 +246,84 @@ namespace ShuiyuanHtmlPrivacyCleaner
             return string.IsNullOrEmpty(detail) ? string.Empty : " (" + detail + ")";
         }
 
-        private static string JoinOrNone(List<string> values)
+        private static string JoinOrNone(List<string> values, ReportLanguage language)
         {
-            return values.Count == 0 ? "未发现或无法读取" : string.Join(", ", values.ToArray());
+            return values.Count == 0 ? (language == ReportLanguage.English ? "not found or unreadable" : "未发现或无法读取") : string.Join(", ", values.ToArray());
+        }
+
+        private static string DescribeItem(string name, ReportLanguage language)
+        {
+            if (name.IndexOf("SingleFile", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return language == ReportLanguage.English ? "This can reveal when the page was saved." : "这类信息可能暴露保存时间。";
+            }
+            if (name.IndexOf("currentUser", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("当前用户", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return language == ReportLanguage.English ? "This can identify the logged-in account." : "这类信息可能定位保存者账号。";
+            }
+            if (name.IndexOf("站点", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("品牌", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("侧栏", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return language == ReportLanguage.English ? "Full anonymous mode removes this so the source site is not exposed." : "全匿名模式会移除这类信息，避免暴露来源站点。";
+            }
+            if (name.IndexOf("用户", StringComparison.OrdinalIgnoreCase) >= 0 || name.IndexOf("徽章", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return language == ReportLanguage.English ? "Full anonymous mode replaces or removes this to protect public users." : "全匿名模式会替换或删除这类信息，避免暴露公开用户身份。";
+            }
+            if (name.IndexOf("水印", StringComparison.OrdinalIgnoreCase) >= 0)
+            {
+                return language == ReportLanguage.English ? "This is a visible or hidden watermark marker." : "这是可见或隐藏水印相关痕迹。";
+            }
+            return string.Empty;
+        }
+
+        private static void AppendTitle(StringBuilder sb, ReportLanguage language, string zh, string en)
+        {
+            AppendLine(sb, language, "# " + zh, "# " + en);
+            sb.AppendLine();
+        }
+
+        private static void AppendLine(StringBuilder sb, ReportLanguage language, string zh, string en)
+        {
+            sb.AppendLine(language == ReportLanguage.English ? en : zh);
+        }
+
+        private void AppendWarnings(StringBuilder sb, ReportLanguage language)
+        {
+            if (Warnings.Count == 0)
+            {
+                return;
+            }
+
+            sb.AppendLine();
+            AppendLine(sb, language, "注意", "Warnings");
+            foreach (string warning in Warnings)
+            {
+                sb.AppendLine("- " + warning);
+            }
+        }
+
+        private static string ConvertLanguage(string text, ReportLanguage language)
+        {
+            if (language != ReportLanguage.TraditionalChinese)
+            {
+                return text;
+            }
+
+            string[,] pairs = new string[,]
+            {
+                { "文件", "檔案" }, { "隐私", "隱私" }, { "输出", "輸出" }, { "输入", "輸入" }, { "读取", "讀取" },
+                { "编码", "編碼" }, { "字符", "字元" }, { "检测", "偵測" }, { "信息", "資訊" }, { "当前", "目前" },
+                { "登录", "登入" }, { "用户", "使用者" }, { "头像", "頭像" }, { "侧栏", "側欄" }, { "浏览", "瀏覽" },
+                { "记录", "紀錄" }, { "隐藏", "隱藏" }, { "数据", "資料" }, { "站点", "網站" }, { "链接", "連結" },
+                { "结果", "結果" }, { "审核", "審核" }, { "发现", "發現" }, { "未发现", "未發現" }, { "删除", "刪除" },
+                { "替换", "替換" }, { "公开", "公開" }, { "类别", "類別" }, { "话题", "話題" }, { "文档", "文件" }
+            };
+            string converted = text;
+            for (int i = 0; i < pairs.GetLength(0); i++)
+            {
+                converted = converted.Replace(pairs[i, 0], pairs[i, 1]);
+            }
+            return converted;
         }
     }
 
@@ -187,6 +430,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             ReadResult read = ReadHtml(inputPath);
             ReportProgress(progress, 25, "正在扫描输入文件...");
             CleaningResult result = BuildBaseResult(inputPath, string.Empty, read);
+            result.Mode = mode;
+            result.IsAnalysisOnly = true;
             result.BeforeStreams.AddRange(AlternateStreams.ListStreams(inputPath));
             ReportProgress(progress, 60, "正在生成分析报告...");
             FillReportAndAudit(result, read.Text, read.Text, new List<string>(NormalizeTerms(personalTerms)), new List<string>());
@@ -225,6 +470,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             ReportProgress(progress, 5, "正在读取输入 HTML...");
             ReadResult read = ReadHtml(inputPath);
             CleaningResult result = BuildBaseResult(inputPath, outputPath, read);
+            result.Mode = mode;
+            result.IsAnalysisOnly = false;
 
             ReportProgress(progress, 15, "正在读取输入文件的数据流信息...");
             result.BeforeStreams.AddRange(AlternateStreams.ListStreams(inputPath));
@@ -352,6 +599,9 @@ namespace ShuiyuanHtmlPrivacyCleaner
             ApplyReplacement(ref text, @"\sdata-immersive-translate-page-theme=(?:[^\s>]+|""[^""]*"")", string.Empty, RegexOptions.None);
             ApplyReplacement(ref text, @"&quot;topicTrackingStateMeta&quot;:&quot;\{.*?\}&quot;", @"&quot;topicTrackingStateMeta&quot;:&quot;{}&quot;", RegexOptions.Singleline);
             ApplyReplacement(ref text, @"<a href=https://shuiyuan\.sjtu\.edu\.cn/unread>\d+ 个未读</a>话题\s*和\s*<a href=https://shuiyuan\.sjtu\.edu\.cn/new>\d+ 个新</a>话题，或浏览", "浏览", RegexOptions.None);
+            ApplyReplacement(ref text, @"\s*<div\b[^>]*\bid=(?:""data-preloaded""|'data-preloaded'|data-preloaded)\b[^>]*>\s*</div>\s*", "\n", RegexOptions.IgnoreCase | RegexOptions.Singleline);
+            ApplyReplacement(ref text, @"\s*<discourse-assets-json>[\s\S]*?</discourse-assets-json>\s*", "\n", RegexOptions.IgnoreCase);
+            ApplyReplacement(ref text, @"\s*<h3\b[^>]*class=(?:""[^""]*\bmore-topics__browse-more\b[^""]*""|'[^']*\bmore-topics__browse-more\b[^']*'|[^\s>]*\bmore-topics__browse-more\b[^\s>]*)[^>]*>[\s\S]*?</h3>\s*", "\n", RegexOptions.IgnoreCase);
 
             ReportProgress(progress, 40, "正在清理主题激活痕迹和 currentUser 数据...");
             RemoveWatermarkThemeActivations(ref text);
@@ -535,7 +785,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             AddItem(result, "currentUser 个人数据", before, after, @"&quot;currentUser&quot;:&quot;(?!null)[\s\S]*?&quot;", RegexOptions.None, "清理后允许 currentUser 为 null");
             AddItem(result, "topic tracking / 未读新帖计数", before, after, @"topicTrackingStateMeta&quot;:&quot;\{\\&quot;/|<a href=https://shuiyuan\.sjtu\.edu\.cn/unread>\d+ 个未读</a>", RegexOptions.None, string.Empty);
 
-            AddItem(result, "站点域名 / 品牌痕迹", before, after, @"(?:shuiyuan\.sjtu\.edu\.cn|shuiyuan\.s3\.jcloud\.sjtu\.edu\.cn|sjtu\.edu\.cn|水源社区|水源广场)", RegexOptions.IgnoreCase, string.Empty);
+            AddItem(result, "站点侧栏 / 导航入口", before, after, @"(?:水源活动|所有类别|所有话题|探索文档话题|<[^>]*data-list-item-name=(?:everything|docs|all-categories|all-tags))", RegexOptions.IgnoreCase, string.Empty);
+            AddItem(result, "站点域名 / 品牌痕迹", before, after, @"(?:shuiyuan\.sjtu\.edu\.cn|shuiyuan\.s3\.jcloud\.sjtu\.edu\.cn|sjtu\.edu\.cn|水源社区|水源广场|水源活动)", RegexOptions.IgnoreCase, string.Empty);
             AddItem(result, "公开用户标识", before, after, @"(?:aria-label=(?:""[^""]+ 的个人资料""|'[^']+ 的个人资料')|data-user-card|data-user-id|/user_avatar/|https?://[^""'\s<>]+/u/)", RegexOptions.IgnoreCase, string.Empty);
             AddItem(result, "用户徽章 / 头衔 / Flair", before, after, @"<(?:span|div|a|img)\b[^>]*class=(?:""[^""]*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^""]*""|'[^']*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^']*'|[^\s>]*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^\s>]*)[^>]*>", RegexOptions.IgnoreCase, string.Empty);
             AddItem(result, "隐藏预加载数据", before, after, @"<discourse-assets-json>[\s\S]*?</discourse-assets-json>", RegexOptions.IgnoreCase, string.Empty);
@@ -551,7 +802,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             AddAudit(result, "水印主题激活", after, "discourse-watermark", "shuiyuan-watermark");
             AddAudit(result, "鉴权 / 主题 Meta 信息", after, "csrf-token", "csrf-param", "discourse_theme_id", "discourse_current_homepage");
             AddRegexAudit(result, "Windows 路径 / file:// 痕迹", after, @"(?<![A-Za-z])[A-Za-z]:[\\/]|file://", RegexOptions.IgnoreCase);
-            AddRegexAudit(result, "站点域名 / 品牌痕迹", after, @"(?:shuiyuan\.sjtu\.edu\.cn|shuiyuan\.s3\.jcloud\.sjtu\.edu\.cn|sjtu\.edu\.cn|水源社区|水源广场)", RegexOptions.IgnoreCase);
+            AddRegexAudit(result, "站点侧栏 / 导航入口", after, @"(?:水源活动|所有类别|所有话题|探索文档话题|<[^>]*data-list-item-name=(?:everything|docs|all-categories|all-tags))", RegexOptions.IgnoreCase);
+            AddRegexAudit(result, "站点域名 / 品牌痕迹", after, @"(?:shuiyuan\.sjtu\.edu\.cn|shuiyuan\.s3\.jcloud\.sjtu\.edu\.cn|sjtu\.edu\.cn|水源社区|水源广场|水源活动)", RegexOptions.IgnoreCase);
             AddRegexAudit(result, "公开用户标识", after, @"(?:aria-label=(?:""[^""]+ 的个人资料""|'[^']+ 的个人资料')|data-user-card|data-user-id|/user_avatar/|https?://[^""'\s<>]+/u/)", RegexOptions.IgnoreCase);
             AddRegexAudit(result, "用户徽章 / 头衔 / Flair", after, @"<(?:span|div|a|img)\b[^>]*class=(?:""[^""]*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^""]*""|'[^']*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^']*'|[^\s>]*(?:\buser-title\b|\bavatar-flair\b|\bposter-icon\b|\bbadge-wrapper\b|\buser-badge\b)[^\s>]*)[^>]*>", RegexOptions.IgnoreCase);
             AddRegexAudit(result, "隐藏预加载数据", after, @"<discourse-assets-json>[\s\S]*?</discourse-assets-json>", RegexOptions.IgnoreCase);

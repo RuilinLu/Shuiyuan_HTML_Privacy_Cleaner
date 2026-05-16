@@ -34,6 +34,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
                 string report = string.Empty;
                 bool overwrite = false;
                 CleaningMode mode = CleaningMode.PersonalOnly;
+                ReportVerbosity verbosity = ReportVerbosity.Standard;
+                ReportLanguage language = ReportLanguage.SimplifiedChinese;
                 List<string> terms = new List<string>();
 
                 for (int i = 3; i < args.Length; i++)
@@ -54,11 +56,19 @@ namespace ShuiyuanHtmlPrivacyCleaner
                     {
                         mode = ParseMode(args[++i]);
                     }
+                    else if (EqualsArg(args[i], "--report-style") && i + 1 < args.Length)
+                    {
+                        verbosity = ParseReportVerbosity(args[++i]);
+                    }
+                    else if (EqualsArg(args[i], "--language") && i + 1 < args.Length)
+                    {
+                        language = ParseReportLanguage(args[++i]);
+                    }
                 }
 
                 CleanerEngine engine = new CleanerEngine();
                 CleaningResult result = engine.Clean(input, output, terms, overwrite, mode);
-                string text = result.ToDisplayText();
+                string text = result.ToDisplayText(verbosity, language);
                 if (!string.IsNullOrWhiteSpace(report))
                 {
                     string directory = Path.GetDirectoryName(report);
@@ -98,6 +108,37 @@ namespace ShuiyuanHtmlPrivacyCleaner
                 return CleaningMode.FullAnonymous;
             }
             return CleaningMode.PersonalOnly;
+        }
+
+        private static ReportVerbosity ParseReportVerbosity(string value)
+        {
+            if (string.Equals(value, "friendly", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "summary", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReportVerbosity.Friendly;
+            }
+            if (string.Equals(value, "technical", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "detail", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReportVerbosity.Technical;
+            }
+            return ReportVerbosity.Standard;
+        }
+
+        private static ReportLanguage ParseReportLanguage(string value)
+        {
+            if (string.Equals(value, "zh-hant", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "zh-tw", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "traditional", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReportLanguage.TraditionalChinese;
+            }
+            if (string.Equals(value, "en", StringComparison.OrdinalIgnoreCase) ||
+                string.Equals(value, "english", StringComparison.OrdinalIgnoreCase))
+            {
+                return ReportLanguage.English;
+            }
+            return ReportLanguage.SimplifiedChinese;
         }
     }
 }

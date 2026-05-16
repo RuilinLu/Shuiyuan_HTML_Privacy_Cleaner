@@ -1,0 +1,17 @@
+<Project Sdk="Microsoft.NET.Sdk">
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <Nullable>disable</Nullable>
+    <ImplicitUsings>disable</ImplicitUsings>
+    <EnableDefaultCompileItems>false</EnableDefaultCompileItems>
+  </PropertyGroup>
+  <ItemGroup>
+    <Compile Include="Program.cs" />
+    <Compile Include="..\..\src\ProgressInfo.cs" Link="ProgressInfo.cs" />
+    <Compile Include="..\..\src\CleanerEngine.cs" Link="CleanerEngine.cs" />
+    <Compile Include="..\..\src\CleanerEngine.Anonymous.cs" Link="CleanerEngine.Anonymous.cs" />
+    <Compile Include="..\..\src\AnonymousIdentityPack.cs" Link="AnonymousIdentityPack.cs" />
+    <EmbeddedResource Include="..\..\assets\anonymous_identity_pack.jsonl.gz" LogicalName="ShuiyuanHtmlPrivacyCleaner.Assets.anonymous_identity_pack.jsonl.gz" />
+  </ItemGroup>
+</Project>

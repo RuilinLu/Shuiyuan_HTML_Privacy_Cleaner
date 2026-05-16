@@ -15,19 +15,22 @@ namespace ShuiyuanHtmlPrivacyCleaner
         private readonly TextBox _reportBox = new TextBox();
         private readonly CheckBox _overwriteBox = new CheckBox();
         private readonly ComboBox _modeBox = new ComboBox();
+        private readonly ComboBox _languageBox = new ComboBox();
+        private readonly ComboBox _reportStyleBox = new ComboBox();
         private readonly Label _statusLabel = new Label();
         private readonly Button _browseInputButton = new Button();
         private readonly Button _browseOutputButton = new Button();
         private readonly Button _analyzeButton = new Button();
         private readonly Button _cleanButton = new Button();
         private readonly Button _openFolderButton = new Button();
+        private CleaningResult _lastResult;
 
         public MainForm()
         {
-            Text = "水源 HTML 隐私清理工具 V6";
+            Text = "HTML 隐私清理工具 V7";
             StartPosition = FormStartPosition.CenterScreen;
-            MinimumSize = new Size(980, 700);
-            Size = new Size(1140, 800);
+            MinimumSize = new Size(1080, 760);
+            Size = new Size(1240, 840);
             Font = new Font("Microsoft YaHei UI", 9F);
             AutoScaleMode = AutoScaleMode.Dpi;
             Icon = Branding.LoadAppIcon();
@@ -40,7 +43,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 92));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 96));
             root.RowStyles.Add(new RowStyle(SizeType.Absolute, 118));
-            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 48));
+            root.RowStyles.Add(new RowStyle(SizeType.Absolute, 88));
             root.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
             Controls.Add(root);
 
@@ -52,8 +55,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             _reportBox.Dock = DockStyle.Fill;
             _reportBox.Multiline = true;
             _reportBox.ScrollBars = ScrollBars.Both;
-            _reportBox.WordWrap = false;
-            _reportBox.Font = new Font("Consolas", 10F);
+            _reportBox.WordWrap = true;
+            _reportBox.Font = new Font("Microsoft YaHei UI", 9.5F);
             _reportBox.ReadOnly = true;
             root.Controls.Add(_reportBox, 0, 4);
 
@@ -95,7 +98,7 @@ namespace ShuiyuanHtmlPrivacyCleaner
             textPanel.Controls.Add(title, 0, 0);
 
             Label subtitle = new Label();
-            subtitle.Text = "V6 直接在原始 Discourse/SingleFile 框架上匿名化，保留版式并移除用户、徽章、站点和外链痕迹。";
+            subtitle.Text = "V7 保留原始 Discourse/SingleFile 框架，支持仅清除保存者与全匿名两种模式，并生成可读审核报告。";
             subtitle.Dock = DockStyle.Fill;
             subtitle.TextAlign = ContentAlignment.TopLeft;
             subtitle.ForeColor = Color.FromArgb(74, 108, 179);
@@ -160,16 +163,22 @@ namespace ShuiyuanHtmlPrivacyCleaner
 
         private Control BuildActionPanel()
         {
-            FlowLayoutPanel panel = new FlowLayoutPanel();
+            TableLayoutPanel panel = new TableLayoutPanel();
             panel.Dock = DockStyle.Fill;
-            panel.FlowDirection = FlowDirection.LeftToRight;
-            panel.WrapContents = false;
+            panel.ColumnCount = 1;
+            panel.RowCount = 2;
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
+            panel.RowStyles.Add(new RowStyle(SizeType.Absolute, 42));
 
+            FlowLayoutPanel settingsRow = new FlowLayoutPanel();
+            settingsRow.Dock = DockStyle.Fill;
+            settingsRow.FlowDirection = FlowDirection.LeftToRight;
+            settingsRow.WrapContents = false;
             Label modeLabel = new Label();
             modeLabel.Text = "模式";
             modeLabel.AutoSize = true;
             modeLabel.Margin = new Padding(0, 12, 4, 3);
-            panel.Controls.Add(modeLabel);
+            settingsRow.Controls.Add(modeLabel);
 
             _modeBox.DropDownStyle = ComboBoxStyle.DropDownList;
             _modeBox.Width = 320;
@@ -177,27 +186,65 @@ namespace ShuiyuanHtmlPrivacyCleaner
             _modeBox.Items.Add("全匿名模式（连站点与其他用户标识一起处理）");
             _modeBox.SelectedIndex = 0;
             _modeBox.SelectedIndexChanged += delegate { AutoSuggestOutput(); };
-            panel.Controls.Add(_modeBox);
+            settingsRow.Controls.Add(_modeBox);
+
+            Label languageLabel = new Label();
+            languageLabel.Text = "语言";
+            languageLabel.AutoSize = true;
+            languageLabel.Margin = new Padding(18, 12, 4, 3);
+            settingsRow.Controls.Add(languageLabel);
+
+            _languageBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _languageBox.Width = 140;
+            _languageBox.Items.Add("中文简体");
+            _languageBox.Items.Add("中文繁體");
+            _languageBox.Items.Add("English");
+            _languageBox.SelectedIndex = 0;
+            _languageBox.SelectedIndexChanged += delegate { RefreshReport(); };
+            settingsRow.Controls.Add(_languageBox);
+
+            Label reportLabel = new Label();
+            reportLabel.Text = "报告";
+            reportLabel.AutoSize = true;
+            reportLabel.Margin = new Padding(18, 12, 4, 3);
+            settingsRow.Controls.Add(reportLabel);
+
+            _reportStyleBox.DropDownStyle = ComboBoxStyle.DropDownList;
+            _reportStyleBox.Width = 160;
+            _reportStyleBox.Items.Add("易读摘要");
+            _reportStyleBox.Items.Add("标准报告");
+            _reportStyleBox.Items.Add("专业明细");
+            _reportStyleBox.SelectedIndex = 1;
+            _reportStyleBox.SelectedIndexChanged += delegate { RefreshReport(); };
+            settingsRow.Controls.Add(_reportStyleBox);
+
+            panel.Controls.Add(settingsRow, 0, 0);
+
+            FlowLayoutPanel actionRow = new FlowLayoutPanel();
+            actionRow.Dock = DockStyle.Fill;
+            actionRow.FlowDirection = FlowDirection.LeftToRight;
+            actionRow.WrapContents = false;
 
             ConfigureButton(_analyzeButton, "仅分析");
             _analyzeButton.Width = 98;
             _analyzeButton.Click += async delegate { await RunAnalyzeAsync(); };
-            panel.Controls.Add(_analyzeButton);
+            actionRow.Controls.Add(_analyzeButton);
 
             ConfigureButton(_cleanButton, "清理并审核");
             _cleanButton.Width = 110;
             _cleanButton.Click += async delegate { await RunCleanAsync(); };
-            panel.Controls.Add(_cleanButton);
+            actionRow.Controls.Add(_cleanButton);
 
             ConfigureButton(_openFolderButton, "打开输出位置");
             _openFolderButton.Width = 118;
             _openFolderButton.Click += delegate { OpenOutputFolder(); };
-            panel.Controls.Add(_openFolderButton);
+            actionRow.Controls.Add(_openFolderButton);
 
             _overwriteBox.Text = "允许覆盖输出文件";
             _overwriteBox.AutoSize = true;
             _overwriteBox.Margin = new Padding(18, 12, 3, 3);
-            panel.Controls.Add(_overwriteBox);
+            actionRow.Controls.Add(_overwriteBox);
+            panel.Controls.Add(actionRow, 0, 1);
             return panel;
         }
 
@@ -291,7 +338,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
                         return engine.AnalyzeOnly(input, terms, mode, progress);
                     });
 
-                _reportBox.Text = result.ToDisplayText();
+                _lastResult = result;
+                RefreshReport();
                 SetReady("分析完成");
             }
             catch (Exception ex)
@@ -330,7 +378,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
                         return engine.Clean(input, output, terms, overwrite, mode, progress);
                     });
 
-                _reportBox.Text = result.ToDisplayText();
+                _lastResult = result;
+                RefreshReport();
                 SetReady("清理完成");
             }
             catch (Exception ex)
@@ -355,6 +404,41 @@ namespace ShuiyuanHtmlPrivacyCleaner
         private CleaningMode GetSelectedMode()
         {
             return _modeBox.SelectedIndex == 1 ? CleaningMode.FullAnonymous : CleaningMode.PersonalOnly;
+        }
+
+        private ReportLanguage GetSelectedLanguage()
+        {
+            if (_languageBox.SelectedIndex == 1)
+            {
+                return ReportLanguage.TraditionalChinese;
+            }
+            if (_languageBox.SelectedIndex == 2)
+            {
+                return ReportLanguage.English;
+            }
+            return ReportLanguage.SimplifiedChinese;
+        }
+
+        private ReportVerbosity GetSelectedReportVerbosity()
+        {
+            if (_reportStyleBox.SelectedIndex == 0)
+            {
+                return ReportVerbosity.Friendly;
+            }
+            if (_reportStyleBox.SelectedIndex == 2)
+            {
+                return ReportVerbosity.Technical;
+            }
+            return ReportVerbosity.Standard;
+        }
+
+        private void RefreshReport()
+        {
+            if (_lastResult == null)
+            {
+                return;
+            }
+            _reportBox.Text = _lastResult.ToDisplayText(GetSelectedReportVerbosity(), GetSelectedLanguage());
         }
 
         private void OpenOutputFolder()
@@ -404,6 +488,8 @@ namespace ShuiyuanHtmlPrivacyCleaner
             _termsBox.Enabled = enabled;
             _overwriteBox.Enabled = enabled;
             _modeBox.Enabled = enabled;
+            _languageBox.Enabled = enabled;
+            _reportStyleBox.Enabled = enabled;
             _browseInputButton.Enabled = enabled;
             _browseOutputButton.Enabled = enabled;
             _analyzeButton.Enabled = enabled;

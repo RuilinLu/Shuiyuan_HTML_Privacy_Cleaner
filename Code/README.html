@@ -1,264 +1,175 @@
 <!doctype html>
 <html lang="zh-CN">
 <head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<title>?? HTML ?????? V6</title>
-<style>
-body{font-family:"Microsoft YaHei UI","Segoe UI",Arial,sans-serif;line-height:1.68;margin:0;background:#f6f8fb;color:#17313b;}
-main{max-width:980px;margin:0 auto;padding:32px 22px 80px;background:#fff;min-height:100vh;box-shadow:0 12px 40px rgba(22,45,61,.08);}
-h1{font-size:30px;margin:0 0 18px;color:#075f68;}
-h2{font-size:22px;margin:34px 0 10px;color:#0a6972;border-bottom:1px solid #d9e5ea;padding-bottom:6px;}
-h3{font-size:18px;margin:24px 0 8px;color:#21444d;}
-p{margin:7px 0;}
-.bullet{padding-left:1.2em;text-indent:-1.2em;}
-.num span{display:inline-block;min-width:2em;color:#0a6972;font-weight:700;}
-pre{background:#0d1b22;color:#d8edf2;padding:14px 16px;border-radius:8px;overflow:auto;}
-code{font-family:Consolas,"Cascadia Mono",monospace;}
-</style>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Shuiyuan HTML Privacy Cleaner V7</title>
+  <style>
+    :root {
+      color-scheme: light;
+      --ink: #14242b;
+      --muted: #5d6f77;
+      --line: #dce8e8;
+      --accent: #0f9f92;
+      --soft: #eef8f6;
+      --warn: #8a5a00;
+      --bg: #fbfaf4;
+    }
+    body {
+      margin: 0;
+      font-family: "Microsoft YaHei UI", "Segoe UI", Arial, sans-serif;
+      line-height: 1.65;
+      background: var(--bg);
+      color: var(--ink);
+    }
+    main {
+      max-width: 980px;
+      margin: 0 auto;
+      padding: 34px 22px 60px;
+    }
+    h1 {
+      margin: 0 0 8px;
+      font-size: 32px;
+      line-height: 1.2;
+    }
+    h2 {
+      margin-top: 34px;
+      padding-top: 18px;
+      border-top: 1px solid var(--line);
+      font-size: 22px;
+    }
+    h3 {
+      margin-top: 24px;
+      font-size: 18px;
+    }
+    p, li {
+      font-size: 15px;
+    }
+    .lead {
+      color: var(--muted);
+      font-size: 16px;
+    }
+    .notice {
+      padding: 14px 16px;
+      border: 1px solid var(--line);
+      background: var(--soft);
+      border-radius: 8px;
+    }
+    code {
+      padding: 2px 5px;
+      border-radius: 4px;
+      background: #eef0ef;
+      font-family: Consolas, "Cascadia Mono", monospace;
+    }
+    pre {
+      overflow: auto;
+      padding: 14px;
+      border-radius: 8px;
+      background: #10292d;
+      color: #f1fbf8;
+    }
+    pre code {
+      padding: 0;
+      background: transparent;
+      color: inherit;
+    }
+    a {
+      color: var(--accent);
+    }
+    .grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+      gap: 14px;
+    }
+    .panel {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 14px 16px;
+      background: #fffef8;
+    }
+  </style>
 </head>
-<body><main>
-<h1>水源 HTML 隐私清理工具 V6</h1>
-
-<p>这是一个可完全离线运行的 Windows 工具，用来清理用 SingleFile 保存的水源/Discourse HTML 快照。程序提供图形界面，也支持命令行批量处理。</p>
-
-<p>V6 的关键变化：全匿名模式不再提取发言后重写一个新页面，而是直接在原始 SingleFile/Discourse HTML 上就地匿名化，尽量保留原版论坛布局、楼层、引用、时间线和静态阅读体验。</p>
-
-<p>本次 V6 更新还修复了三个公开分发前发现的问题：</p>
-
-<p class="bullet">? 全匿名模式会在每个帖子头像旁和帖子头部显示一致的 `用户1`、`用户2` 等匿名编号，并用内嵌 SVG 虚拟头像替换原头像。</p>
-<p class="bullet">? 用户名替换会先保护 `data:image/...` 资源，避免误改 Base64 导致正文图片无法渲染。</p>
-<p class="bullet">? 全匿名模式会移除底部推荐/相关话题区和登录交互页脚，避免额外站点信息残留，也避免静态快照里推荐列表错位。</p>
-
-<h2>前提背景</h2>
-
-<p>这个工具处理的不是网页截图图片，也不是正在联网浏览的网页，而是 SingleFile 浏览器扩展保存出来的单文件 `.html` 快照。推荐流程是：</p>
-
-<p class="num"><span>1.</span> 在 Edge 浏览器中安装 SingleFile。</p>
-<p class="num"><span>2.</span> 打开需要保存的水源社区页面。</p>
-<p class="num"><span>3.</span> 用 SingleFile 保存当前页面，得到一个 `.html` 文件。</p>
-<p class="num"><span>4.</span> 再用本工具清理这个 `.html` 文件中的水印、登录态和隐私痕迹。</p>
-
-<p>SingleFile 项目和使用说明可以参考这个仓库：</p>
-
-<p class="bullet">? &lt;https://github.com/RuilinLu/SingleFile&gt;</p>
-
-<p>我目前重点测试过的组合是：</p>
-
-<p class="bullet">? Edge 浏览器</p>
-<p class="bullet">? SingleFile 扩展</p>
-<p class="bullet">? Windows x64</p>
-<p class="bullet">? `dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`</p>
-
-<p>其他浏览器、Windows x86、Windows ARM64 的 EXE 已经构建出来，其中 x86 在 x64 Windows 上做过命令行清理验证，ARM64 做过二进制架构校验；但我没有 ARM64 真机，所以 ARM64 运行效果需要对应设备再验证。</p>
-
-<h2>Release 怎么安装</h2>
-
-<p>如果你只是使用工具，不需要下载源码：</p>
-
-<p class="num"><span>1.</span> 打开 GitHub Releases。</p>
-<p class="num"><span>2.</span> 根据你的 Windows 架构下载对应 EXE：</p>
-<p>   - `ShuiyuanHtmlPrivacyCleaner-win-x64.exe`：推荐，大多数 64 位 Windows 电脑使用这个。</p>
-<p>   - `ShuiyuanHtmlPrivacyCleaner-win-x86.exe`：仅用于 32 位 Windows。</p>
-<p>   - `ShuiyuanHtmlPrivacyCleaner-win-arm64.exe`：仅用于 Windows ARM64 设备。</p>
-<p class="num"><span>3.</span> 双击 EXE 即可运行，不需要安装 .NET，也不需要联网。</p>
-<p class="num"><span>4.</span> 如果 Windows SmartScreen 提示未知发布者，需要手动选择“更多信息”再运行。这个工具没有代码签名证书。</p>
-
-<p>如果你想审计或二次开发，下载源码或克隆仓库后看 `Code/src`。</p>
-
-<h2>能清理什么</h2>
-
-<p class="bullet">? SingleFile 保存时间注释</p>
-<p class="bullet">? 可见平铺水印</p>
-<p class="bullet">? 隐藏低透明度整页水印</p>
-<p class="bullet">? 右上角当前登录用户头像和账号入口</p>
-<p class="bullet">? `currentUser` 中的保存者账号数据</p>
-<p class="bullet">? “我的帖子”“浏览记录”、未读/新帖计数、阅读状态标记</p>
-<p class="bullet">? Thunderbit、沉浸式翻译等浏览器扩展残留</p>
-<p class="bullet">? CSRF token、主题激活、主题 tracking 等保存态痕迹</p>
-<p class="bullet">? 用户手动填写的额外审核关键词</p>
-<p class="bullet">? 全匿名模式下的站点域名、站点品牌、外链、预加载 JSON、公开用户标识、头像、用户徽章/头衔/flair</p>
-
-<h2>两种模式</h2>
-
-<p>`仅清除当前保存者 / 登录者信息`</p>
-
-<p class="bullet">? 用途：你只是想删除自己的水印、登录态、头像、ID、昵称和保存痕迹。</p>
-<p class="bullet">? 会清理当前保存者的 `currentUser`、水印、隐水印、右上角账号入口、保存时间、扩展残留、CSRF token。</p>
-<p class="bullet">? 会保留页面原有站点名称、帖子里其他公开用户、公开头像、用户徽章、公开链接和论坛原始结构。</p>
-<p class="bullet">? 因此报告里“站点域名 / 品牌痕迹”“公开用户标识”“用户徽章 / 头衔 / Flair”仍可能大于 0，这是这个模式的设计目标。</p>
-
-<p>`全匿名模式（连站点与其他用户标识一起处理）`</p>
-
-<p class="bullet">? 用途：你想把 HTML 作为匿名存档分享，不希望看出保存者、其他用户、站点来源或外部资源地址。</p>
-<p class="bullet">? 会在原始 Discourse/SingleFile 框架内就地改写，不走“提取发言再重新生成页面”的流程。</p>
-<p class="bullet">? 会把同一用户的昵称、用户名、`@用户名`、用户链接、头像 title/alt 等尽量统一替换为同一个 `用户1`、`用户2`。</p>
-<p class="bullet">? 会给帖子头部和头像区补充一致的匿名编号；原始头像会替换为本地生成的虚拟头像，不再保留原头像 CSS 图片变量。</p>
-<p class="bullet">? 会移除所有用户徽章、头衔、flair 节点，不限定于某几个徽章名称。</p>
-<p class="bullet">? 会删除 Discourse 预加载 JSON 和站点外链，避免隐藏数据中残留原始用户、图片 URL 或站点域名。</p>
-<p class="bullet">? 会删除底部“推荐/相关”话题列表、通知按钮等与当前正文无关的登录态/推荐信息。</p>
-
-<h2>界面说明</h2>
-
-<p>主窗口从上到下分为这些区域：</p>
-
-<p class="num"><span>1.</span> 顶部标题区  </p>
-<p>   左侧显示 `Figure/shuiyuan_html_watermark_tool_logo.svg` 生成的 logo，右侧显示工具标题和当前版本说明。</p>
-
-<p class="num"><span>2.</span> `输入 HTML`  </p>
-<p>   选择原始 SingleFile 保存的 `.html` 或 `.htm` 文件。</p>
-
-<p class="num"><span>3.</span> `输出 HTML`  </p>
-<p>   选择清理后的保存位置。切换模式时，程序会自动建议 `_去水印去个人信息` 或 `_全匿名版` 文件名。</p>
-
-<p class="num"><span>4.</span> `审核关键词`  </p>
-<p>   每行一个关键词，也支持逗号、分号、中文逗号、中文分号。适合填写用户名、用户 ID、头像编号、时间戳、昵称、可疑字符串。</p>
-
-<p class="num"><span>5.</span> `模式` 下拉框  </p>
-<p>   选择“仅清除当前保存者 / 登录者信息”或“全匿名模式”。</p>
-
-<p class="num"><span>6.</span> `仅分析`  </p>
-<p>   只扫描输入文件并生成报告，不写出新 HTML。</p>
-
-<p class="num"><span>7.</span> `清理并审核`  </p>
-<p>   执行清理、写出 HTML，并立刻对输出文件做一遍审核。</p>
-
-<p class="num"><span>8.</span> `打开输出位置`  </p>
-<p>   在资源管理器中定位输出文件；如果文件还没生成，就打开输出目录。</p>
-
-<p class="num"><span>9.</span> `允许覆盖输出文件`  </p>
-<p>   勾选后允许覆盖已有输出文件；不勾选时，输出文件已存在会报错。</p>
-
-<p class="num"><span>10.</span> 报告区  </p>
-<p>   显示“清理前检测到的信息”“实际移除或改写”“清理后审核结果”和注意事项。</p>
-
-<p class="num"><span>11.</span> 底部状态栏  </p>
-<p>   显示当前阶段，例如“就绪”“正在执行清理规则”“清理完成”“出错”。</p>
-
-<h2>进度窗口</h2>
-
-<p>点击 `仅分析` 或 `清理并审核` 后，程序会弹出独立进度窗口。</p>
-
-<p class="bullet">? 绿色进度条是真实百分比，只从左到右走一遍。</p>
-<p class="bullet">? 百分比文字会显示为 `当前进度: 72%` 这种形式。</p>
-<p class="bullet">? 阶段文字会显示正在读取、扫描、清理、修复 HTML、写出文件、审核等步骤。</p>
-<p class="bullet">? 全匿名模式处理大文件时可能比个人模式慢，这是因为它要扫描和替换所有公开用户与隐藏预加载数据。</p>
-
-<h2>推荐流程</h2>
-
-<p class="num"><span>1.</span> 在 Edge 中打开目标页面。</p>
-<p class="num"><span>2.</span> 用 SingleFile 保存当前页面为单个 `.html` 文件。</p>
-<p class="num"><span>3.</span> 打开 `dist/win-x64/ShuiyuanHtmlPrivacyCleaner.exe`，如果是 32 位 Windows 用 `win-x86`，Windows ARM64 用 `win-arm64`。</p>
-<p class="num"><span>4.</span> 选择输入 HTML。</p>
-<p class="num"><span>5.</span> 确认输出 HTML。</p>
-<p class="num"><span>6.</span> 选择清理模式。</p>
-<p class="num"><span>7.</span> 有特别担心的昵称、ID、头像编号或字符串时，填入 `审核关键词`。</p>
-<p class="num"><span>8.</span> 先点 `仅分析` 看原文件里有什么。</p>
-<p class="num"><span>9.</span> 再点 `清理并审核`。</p>
-<p class="num"><span>10.</span> 打开输出 HTML，确认页面能正常显示。</p>
-<p class="num"><span>11.</span> 只分享清理后的 HTML 和报告，不分享原始 HTML。</p>
-
-<h2>命令行模式</h2>
-
-<pre><code>.\ShuiyuanHtmlPrivacyCleaner.exe --clean &quot;input.html&quot; &quot;output.html&quot; `
-  --mode full `
-  --term &quot;用户名&quot; `
-  --term &quot;用户ID&quot; `
-  --report &quot;report.txt&quot; `
-  --overwrite</code></pre>
-
-<p>参数：</p>
-
-<p class="bullet">? `--clean input output`：指定输入和输出 HTML。</p>
-<p class="bullet">? `--mode personal`：仅清除当前保存者 / 登录者信息。</p>
-<p class="bullet">? `--mode full`：全匿名模式。</p>
-<p class="bullet">? `--term`：追加审核关键词，可重复多次。</p>
-<p class="bullet">? `--report`：写出文本报告。</p>
-<p class="bullet">? `--overwrite`：允许覆盖已有输出文件。</p>
-
-<p>路径中有空格时必须加英文双引号。</p>
-
-<h2>图标与 logo</h2>
-
-<p>项目使用两个图形源文件：</p>
-
-<p class="bullet">? `Figure/shuiyuan_symbol_app_icon.svg`：生成 EXE 图标。</p>
-<p class="bullet">? `Figure/shuiyuan_html_watermark_tool_logo.svg`：生成程序窗口左上角 logo。</p>
-
-<p>构建时会生成：</p>
-
-<p class="bullet">? `Figure/shuiyuan_symbol_app_icon.ico`</p>
-<p class="bullet">? `Figure/shuiyuan_symbol_app_icon.png`</p>
-<p class="bullet">? `Figure/shuiyuan_html_watermark_tool_logo.png`</p>
-
-<h2>源码与发布目录</h2>
-
-<p>发布包结构：</p>
-
-<pre><code>APP/V6/
-  Code/
-    src/
-    Figure/
-    tools/
-    tests/
-    ShuiyuanHtmlPrivacyCleaner.csproj
-    build.ps1
-    README.md
-    README.html
-  dist/
-    win-x64/
-    win-x86/
-    win-arm64/
-  Figure/
-  README.md
-  README.html
-  CHECKSUMS-SHA256.txt</code></pre>
-
-<p>`Code` 是完整开源源码；`dist` 是已经发布好的离线 EXE。</p>
-
-<h2>技术栈和语言占比说明</h2>
-
-<p>主要语言是 C#：</p>
-
-<p class="bullet">? `Code/src/*.cs`：核心程序，WinForms 图形界面、命令行入口、清理引擎、报告生成。</p>
-<p class="bullet">? `Code/tools/*.ps1` 和 `build.ps1`：PowerShell 构建脚本，用来从 SVG 生成图标并发布三架构 EXE。</p>
-<p class="bullet">? `README.md` / `README.html`：使用说明文档。</p>
-
-<p>项目不是 Python 工具，也不依赖 Node.js。最终 EXE 是 .NET 9 Windows self-contained 单文件发布。</p>
-
-<h2>构建</h2>
-
-<p>构建机器需要 Windows 和 .NET 9 SDK：</p>
-
-<pre><code>.\build.ps1</code></pre>
-
-<p>构建脚本会生成图标资源，并发布：</p>
-
-<p class="bullet">? `dist/win-x64`</p>
-<p class="bullet">? `dist/win-x86`</p>
-<p class="bullet">? `dist/win-arm64`</p>
-
-<p>发布出来的 EXE 是 self-contained 单文件程序，目标机器只要是 Windows，不需要预装 .NET。</p>
-
-<h2>V6 验收结果</h2>
-
-<p>本轮 V6 已用真实样本验证：</p>
-
-<p class="bullet">? 真实样本 A 全匿名：Edge 实际打开后 `topic-post=21`，`cooked=21`，页面高度约 `5952px`，不是空白页。</p>
-<p class="bullet">? 真实样本 B 全匿名：Edge 实际打开后 `topic-post=62`，`cooked=62`，页面高度约 `15947px`，不是空白页。</p>
-<p class="bullet">? 最新全匿名回归样本：21 个帖子均有可见匿名编号；头像均为内嵌 SVG 虚拟头像；正文 PNG Base64 校验通过；Edge 截图显示正文图片正常渲染；底部推荐区已移除，不再错位。</p>
-<p class="bullet">? 全匿名输出中保存者关键词、站点域名、公开用户标识、用户徽章节点、隐藏预加载数据、站点外链、CSRF、SingleFile 保存时间、水印、隐水印均审核为 0。</p>
-<p class="bullet">? 个人模式在两个样本上均清除了保存者个人关键词、水印、隐水印、`currentUser` 和登录态，但按设计保留公开站点和其他用户信息。</p>
-
-<p>严格说明：任何工具都不能数学证明未知隐写或任意构造隐藏信息 100% 不存在。V6 的审核覆盖了当前已知的 SingleFile/Discourse 水印、隐水印、登录态、预加载数据、用户标识、外链和站点痕迹。</p>
-
-<h2>版本命名</h2>
-
-<p class="bullet">? `APP/V1`：第一版个人信息清理工具。</p>
-<p class="bullet">? `APP/V2`：加入双模式雏形。</p>
-<p class="bullet">? `APP/V3`：加入进度窗口，但全匿名大文件仍可能体验差。</p>
-<p class="bullet">? `APP/V4`：修复中文和进度体验，曾使用静态重建方案。</p>
-<p class="bullet">? `APP/V5`：全匿名改为在原始 Discourse/SingleFile 框架内就地匿名化，修复 `&lt;style&gt;` 吞 DOM 导致空白页的问题。</p>
-<p class="bullet">? `APP/V6`：在 V5 基础上补充匿名头像、帖子头部编号、图片 Base64 保护和推荐区移除，并更新三架构发布包。</p>
-
-</main></body></html>
+<body>
+<main>
+  <h1>Shuiyuan HTML Privacy Cleaner V7</h1>
+  <p class="lead">完全离线运行的 Windows 工具，用于清理由 SingleFile 保存的水源社区 / Discourse 单文件 HTML 快照。</p>
+
+  <section class="notice">
+    <strong>V7 重点：</strong>全匿名模式在原始 SingleFile/Discourse HTML 上就地处理，不抽取帖子重写页面；保留论坛阅读布局、回复引用、图片、表情和话题统计区，同时去除保存者、公开用户、站点身份和隐藏预加载数据等隐私痕迹。
+  </section>
+
+  <h2>适用前提</h2>
+  <ol>
+    <li>在 Edge 浏览器中安装 SingleFile。</li>
+    <li>打开需要归档的水源社区页面。</li>
+    <li>用 SingleFile 保存当前页面，得到一个单文件 <code>.html</code> 快照。</li>
+    <li>用本工具清理这个 HTML，再分发清理后的副本。</li>
+  </ol>
+  <p>SingleFile 参考仓库：<a href="https://github.com/RuilinLu/SingleFile">https://github.com/RuilinLu/SingleFile</a></p>
+  <p>目前重点测试组合为 Edge + SingleFile + Windows x64 + <code>win-x64</code> 版本。<code>win-x86</code> 已在 x64 Windows 上做过命令行验证；<code>win-arm64</code> 已构建和校验架构，但未在 ARM64 真机验证。</p>
+
+  <h2>下载和安装</h2>
+  <p>只使用程序时，下载对应架构的 <code>ShuiyuanHtmlPrivacyCleaner.exe</code> 即可，不需要安装 .NET，也不需要联网。</p>
+  <div class="grid">
+    <div class="panel"><strong>大多数 Windows 电脑</strong><br><code>win-x64/ShuiyuanHtmlPrivacyCleaner.exe</code></div>
+    <div class="panel"><strong>旧 32 位 Windows</strong><br><code>win-x86/ShuiyuanHtmlPrivacyCleaner.exe</code></div>
+    <div class="panel"><strong>Windows on ARM</strong><br><code>win-arm64/ShuiyuanHtmlPrivacyCleaner.exe</code></div>
+  </div>
+
+  <h2>文档导航</h2>
+  <ul>
+    <li><a href="docs/INSTALL.md">安装指南</a></li>
+    <li><a href="docs/USER_GUIDE.md">界面和模式使用说明</a></li>
+    <li><a href="docs/PRIVACY_MODEL.md">隐私模型和限制</a></li>
+    <li><a href="docs/VALIDATION.md">验证指南</a></li>
+    <li><a href="docs/DEVELOPMENT.md">开发构建指南</a></li>
+    <li><a href="docs/RELEASE.md">发布流程</a></li>
+    <li><a href="SECURITY.md">安全说明</a></li>
+    <li><a href="CONTRIBUTING.md">贡献指南</a></li>
+  </ul>
+
+  <h2>界面说明</h2>
+  <ol>
+    <li><strong>输入 HTML：</strong>选择 SingleFile 保存出来的原始 HTML。</li>
+    <li><strong>输出 HTML：</strong>选择清理后文件的保存位置；留空时自动生成新文件名。</li>
+    <li><strong>审核关键词：</strong>每行一个你额外担心的用户名、昵称、ID、头像编号、时间戳或路径片段。</li>
+    <li><strong>模式：</strong>选择“仅清除当前保存者 / 登录者信息”或“全匿名模式”。</li>
+    <li><strong>语言：</strong>支持简体中文、繁体中文和英文。</li>
+    <li><strong>报告：</strong>支持易读摘要、标准报告和专业明细。</li>
+    <li><strong>仅分析：</strong>只扫描输入文件，不写出新 HTML。</li>
+    <li><strong>清理并审核：</strong>生成输出 HTML，并立即显示清理前、实际处理、清理后审核结果。</li>
+    <li><strong>打开输出位置：</strong>打开输出文件所在文件夹。</li>
+  </ol>
+  <p>运行时会显示真实百分比进度条。全匿名模式处理大文件会更慢，但不应空白卡死。</p>
+
+  <h2>两种模式</h2>
+  <h3>仅清除当前保存者 / 登录者信息</h3>
+  <p>移除水印、隐水印、SingleFile 保存时间、右上角账号入口、currentUser、我的帖子、浏览记录、未读计数、扩展残留和额外关键词等；公开帖子作者、站点名称和正文中的公开内容会保留。</p>
+
+  <h3>全匿名模式</h3>
+  <p>在上面基础上，继续匿名化所有公开用户，去除徽章/头衔/Flair、站点域名、站点名称、侧栏导航、隐藏预加载数据、原图 URL 和站点外链。同一个真实用户会稳定映射到同一套虚构头像、昵称和用户名。</p>
+  <p>V7 会保留 Discourse 的话题统计 / 参与者摘要行，例如“浏览量、赞、链接、用户 + 参与者头像”。这块会被匿名化，并强制横向一行显示，避免头像竖排错位。</p>
+
+  <h2>命令行用法</h2>
+  <pre><code>ShuiyuanHtmlPrivacyCleaner.exe --clean input.html output.html --mode personal --report report.txt --report-style standard --language zh-CN --overwrite</code></pre>
+  <pre><code>ShuiyuanHtmlPrivacyCleaner.exe --clean input.html output_full.html --mode full --report report_full.txt --report-style standard --language zh-CN --overwrite</code></pre>
+
+  <h2>本地构建</h2>
+  <p>需要 Windows 和 .NET SDK 9。</p>
+  <pre><code>.\build.ps1</code></pre>
+  <p>输出位于 <code>dist/win-x64</code>、<code>dist/win-x86</code>、<code>dist/win-arm64</code>，并生成 <code>CHECKSUMS-SHA256.txt</code>。</p>
+
+  <h2>验收重点</h2>
+  <ol>
+    <li>清理后的 HTML 能在 Edge 中打开，不是空白页。</li>
+    <li>全匿名模式下，同一用户在帖子头部、头像、回复引用、@用户名、topic map 中使用同一套虚构身份。</li>
+    <li>话题统计 / 参与者摘要行仍然存在，并横向一行显示。</li>
+    <li>报告中的水印、currentUser、站点域名、公开用户标识、徽章/Flair、隐藏预加载数据、站点外链等审核项为 0。</li>
+    <li>源码仓库和发布包不包含私人测试 HTML、截图、报告或本机路径。</li>
+  </ol>
+
+  <h2>隐私说明</h2>
+  <p>本工具针对 SingleFile 保存的水源/Discourse HTML 快照做静态清理。它会尽力去除已知水印、登录态、站点身份、用户身份和隐藏预加载数据，但不能数学证明任意未知隐写信息 100% 不存在。分发重要文件前，建议使用全匿名模式、额外关键词审核，并手动打开输出 HTML 复核可见内容。</p>
+</main>
+</body>
+</html>

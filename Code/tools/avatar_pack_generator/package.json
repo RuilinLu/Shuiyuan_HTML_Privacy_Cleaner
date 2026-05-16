@@ -1,0 +1,16 @@
+{
+  "name": "shuiyuan-avatar-pack-generator",
+  "private": true,
+  "type": "module",
+  "version": "1.0.0",
+  "description": "Builds the offline avatar/name asset pack for ShuiyuanHtmlPrivacyCleaner.",
+  "license": "MIT",
+  "scripts": {
+    "build": "node build-identity-pack.mjs"
+  },
+  "dependencies": {
+    "@dicebear/collection": "^9.2.4",
+    "@dicebear/core": "^9.2.4",
+    "@faker-js/faker": "^9.9.0"
+  }
+}

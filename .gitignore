@@ -1,13 +1,41 @@
+# Private local validation inputs/outputs
+local_validation*
+private_validation*
+scratch_validation*
+sample_*.html
+sample_*.txt
+sample_*.png
+test_*.html
+test_*.txt
+test_*.png
+TEST/
+*_报告.txt
+*_report.txt
+*_full.html
+*_personal.html
+*_clean.html
+*_去水印去个人信息.html
+*_全匿名版.html
+*.png
+
+# Build/cache folders
+dist/
 bin/
 obj/
-publish/
-build/
-dist/
-Figure/*.png
-Figure/*.ico
-Code/Figure/*.png
-Code/Figure/*.ico
+node_modules/
+Code/assets/*.gz
+.appdata/
+.localappdata/
+.chrome-headless/
+.edge-*/
+edge-*/
+
+# Debug symbols and local IDE files
+*.pdb
 *.user
 *.suo
-*.pdb
-*.log
+.vs/
+
+# Keep intentional figures
+!Figure/*.png
+!Code/Figure/*.png
